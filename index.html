@@ -908,27 +908,29 @@ async function loadGoalTicker(){
   }
 }
 
-// ── CONTADOR DE VISITAS EN VIVO (storage real, persistente) ──
+// ── PRESENCIA Y VISITAS REALES (conectado al backend, no simulado) ──
+let hasRegisteredVisit = false;
+
 async function initVisitors(){
-  try{
-    const KEY = 'shocktv_visitors_v1';
-    const SES = 'shocktv_ses_' + Math.floor(Date.now() / 1800000);
-    let d = {total: 318, sessions: {}};
-    try{ const r = await window.storage.get(KEY); if(r) d = JSON.parse(r.value); }catch(_){}
-    if(!d.sessions) d.sessions = {};
-    if(!d.total || d.total < 318) d.total = 318;
-    if(!d.sessions[SES]){
-      d.total++;
-      d.sessions[SES] = Date.now();
-      const cutoff = Date.now() - 3*3600000;
-      for(const k of Object.keys(d.sessions)) if(d.sessions[k] < cutoff) delete d.sessions[k];
-      try{ await window.storage.set(KEY, JSON.stringify(d)); }catch(_){}
-    }
-    document.getElementById('onlineNow').textContent = Math.max(1, Object.keys(d.sessions).length);
-    document.getElementById('totalVisits').textContent = d.total.toLocaleString('es-AR');
-  }catch(e){
-    document.getElementById('onlineNow').textContent = '1';
-    document.getElementById('totalVisits').textContent = '318';
+  await sendPresencePing();
+  setInterval(sendPresencePing, 25000);
+}
+
+async function sendPresencePing(){
+  const sessionId = getVoterId();
+  const isNewVisit = !hasRegisteredVisit;
+  const result = await fetchSTV('/api/presence/ping', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, isNewVisit })
+  });
+  if(result){
+    hasRegisteredVisit = true;
+    document.getElementById('onlineNow').textContent = result.online;
+    document.getElementById('totalVisits').textContent = result.totalVisits.toLocaleString('es-AR');
+  }else{
+    document.getElementById('onlineNow').textContent = '—';
+    document.getElementById('totalVisits').textContent = '—';
   }
 }
 
@@ -1090,16 +1092,26 @@ function timeAgo(ts){
   return Math.floor(hrs / 24) + 'd';
 }
 
+function getSavedName(){
+  try{ return localStorage.getItem('shocktv_username') || ''; }catch(e){ return ''; }
+}
+
+function saveUsername(name){
+  try{ localStorage.setItem('shocktv_username', name); }catch(e){}
+}
+
 async function renderCommentsTab(){
   const body = document.getElementById('modalBody');
   const comments = await fetchSTV(`/api/comments/${encodeURIComponent(currentMatchKey)}`) || [];
+  const savedName = getSavedName();
+  const myVoterId = getVoterId();
 
   const list = comments.length
     ? comments.slice().reverse().map(c => `
         <div class="comment-item">
           <div class="comment-avatar">${(c.name||'?').slice(0,2).toUpperCase()}</div>
           <div class="comment-body">
-            <span class="comment-author">${c.name}<span class="comment-time">${timeAgo(c.ts)}</span></span>
+            <span class="comment-author">${c.name}${c.voterId === myVoterId ? ' <span style="color:var(--accent2);font-size:9px;">(vos)</span>' : ''}<span class="comment-time">${timeAgo(c.ts)}</span></span>
             <div class="comment-text">${c.text}</div>
           </div>
         </div>`).join('')
@@ -1108,11 +1120,11 @@ async function renderCommentsTab(){
   body.innerHTML = `
     <div class="comment-form">
       <div class="comment-input-row">
-        <input type="text" class="comment-name-input" id="commentName" placeholder="Tu nombre" maxlength="20">
+        <input type="text" class="comment-name-input" id="commentName" placeholder="Tu nombre" maxlength="20" value="${savedName}">
         <input type="text" class="comment-text-input" id="commentText" placeholder="Escribí un comentario..." maxlength="200">
         <button class="comment-send-btn" onclick="postComment()">➤</button>
       </div>
-      <div style="font-size:9.5px;color:var(--muted);">Los comentarios son públicos y visibles para todos los visitantes</div>
+      <div style="font-size:9.5px;color:var(--muted);">${savedName ? `Comentando como <strong style="color:var(--accent2);">${savedName}</strong> · ` : ''}Los comentarios son públicos y visibles para todos</div>
     </div>
     <div class="comment-list" id="commentList">${list}</div>
   `;
@@ -1129,10 +1141,13 @@ async function postComment(){
   const text = textInput.value.trim();
   if(!text){ toast('⚠️ Escribí algo primero'); return; }
 
+  saveUsername(name);
+  const voterId = getVoterId();
+
   const result = await fetchSTV(`/api/comments/${encodeURIComponent(currentMatchKey)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, text })
+    body: JSON.stringify({ name, text, voterId })
   });
   if(!result){ toast('❌ No se pudo publicar. Verificá tu conexión.'); return; }
   textInput.value = '';
