@@ -209,6 +209,26 @@ body{padding-bottom:72px;}
 .bn-label{font-size:9.5px;font-weight:500;}
 .bn-badge{position:absolute;top:4px;right:calc(50% - 18px);background:var(--accent);color:white;font-size:8px;font-weight:700;min-width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0 3px;}
 @media(min-width:640px){.bottom-nav{display:none;}body{padding-bottom:0;}}
+.comment-reply-btn{background:none;border:none;color:var(--muted);font-size:10.5px;cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:4px;font-family:'Inter',sans-serif;}
+.comment-reply-btn:hover{color:var(--accent2);}
+.comment-replies{margin-top:8px;padding-left:12px;border-left:2px solid var(--border);display:flex;flex-direction:column;gap:8px;}
+.reply-item{display:flex;gap:7px;}
+.reply-avatar{width:22px;height:22px;border-radius:50%;background:rgba(34,211,168,0.2);color:var(--accent2);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0;}
+.reply-body{flex:1;background:var(--card2);border-radius:8px;padding:6px 9px;min-width:0;}
+.reply-form{margin-top:6px;display:none;flex-direction:column;gap:5px;}
+.reply-form.open{display:flex;}
+.reply-input-row{display:flex;gap:5px;}
+.reply-input{flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:0 10px;height:32px;font-size:12px;color:var(--text);outline:none;font-family:'Inter',sans-serif;min-width:0;}
+.reply-send{background:var(--accent2);color:#0B0E14;border:none;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;flex-shrink:0;}
+.community-hdr{margin-bottom:1rem;}
+.community-hdr h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;}
+.community-hdr p{font-size:11px;color:var(--muted);margin-top:2px;}
+.feed-item{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1rem;margin-bottom:10px;}
+.feed-match-tag{font-size:10.5px;color:var(--accent2);background:rgba(34,211,168,0.08);border:1px solid rgba(34,211,168,0.2);padding:2px 9px;border-radius:50px;display:inline-block;margin-bottom:8px;cursor:pointer;}
+.feed-match-tag:hover{background:rgba(34,211,168,0.15);}
+.feed-empty{text-align:center;padding:3rem 1rem;color:var(--muted);font-size:13px;}
+.community-compose{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1rem;margin-bottom:1rem;}
+.community-compose-title{font-size:11px;color:var(--muted);margin-bottom:8px;}
 </style>
 </head>
 <body>
@@ -1095,9 +1115,63 @@ function timeAgo(ts){
 function getSavedName(){
   try{ return localStorage.getItem('shocktv_username') || ''; }catch(e){ return ''; }
 }
-
 function saveUsername(name){
   try{ localStorage.setItem('shocktv_username', name); }catch(e){}
+}
+
+function commentHTML(c, myVoterId, showMatch){
+  const isMine = c.voterId === myVoterId;
+  const repliesHTML = (c.replies||[]).map(r => `
+    <div class="reply-item">
+      <div class="reply-avatar">${(r.name||'?').slice(0,2).toUpperCase()}</div>
+      <div class="reply-body">
+        <span class="comment-author" style="font-size:11px;">${r.name}${r.voterId===myVoterId?'<span style="color:var(--accent2);font-size:9px;"> (vos)</span>':''}<span class="comment-time">${timeAgo(r.ts)}</span></span>
+        <div class="comment-text" style="font-size:11.5px;">${r.text}</div>
+      </div>
+    </div>`).join('');
+
+  return `
+    <div class="comment-item" id="comment-${c.id}">
+      <div class="comment-avatar" style="${isMine?'background:var(--accent2);color:#0B0E14;':''}">${(c.name||'?').slice(0,2).toUpperCase()}</div>
+      <div class="comment-body" style="flex:1;">
+        ${showMatch && c.matchKey ? `<div class="feed-match-tag" onclick="void(0)">⚽ ${c.matchKey.replace(/_vs_/,' vs ').replace(/_/g,' ').split('_')[0]}</div>` : ''}
+        <span class="comment-author">${c.name}${isMine?'<span style="color:var(--accent2);font-size:9px;"> (vos)</span>':''}<span class="comment-time">${timeAgo(c.ts)}</span></span>
+        <div class="comment-text">${c.text}</div>
+        <button class="comment-reply-btn" onclick="toggleReplyForm('${c.id}')">↩ Responder${c.replies&&c.replies.length?` · ${c.replies.length} respuesta${c.replies.length>1?'s':''}`:''}
+        </button>
+        ${repliesHTML ? `<div class="comment-replies">${repliesHTML}</div>` : ''}
+        <div class="reply-form" id="reply-form-${c.id}">
+          <div class="reply-input-row">
+            <input type="text" class="reply-input" id="reply-text-${c.id}" placeholder="Escribí tu respuesta..." maxlength="200">
+            <button class="reply-send" onclick="postReply('${c.id}')">➤</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function toggleReplyForm(commentId){
+  const form = document.getElementById('reply-form-' + commentId);
+  if(!form) return;
+  form.classList.toggle('open');
+  if(form.classList.contains('open')) form.querySelector('input').focus();
+}
+
+async function postReply(commentId){
+  const input = document.getElementById('reply-text-' + commentId);
+  if(!input) return;
+  const text = input.value.trim();
+  const name = getSavedName() || 'Hincha anónimo';
+  if(!text){ toast('⚠️ Escribí algo primero'); return; }
+
+  const result = await fetchSTV(`/api/comments/${encodeURIComponent(currentMatchKey)}/reply/${commentId}`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name, text, voterId: getVoterId() })
+  });
+  if(!result){ toast('❌ No se pudo enviar la respuesta.'); return; }
+  toast('💬 Respuesta publicada');
+  renderCommentsTab();
 }
 
 async function renderCommentsTab(){
@@ -1107,14 +1181,7 @@ async function renderCommentsTab(){
   const myVoterId = getVoterId();
 
   const list = comments.length
-    ? comments.slice().reverse().map(c => `
-        <div class="comment-item">
-          <div class="comment-avatar">${(c.name||'?').slice(0,2).toUpperCase()}</div>
-          <div class="comment-body">
-            <span class="comment-author">${c.name}${c.voterId === myVoterId ? ' <span style="color:var(--accent2);font-size:9px;">(vos)</span>' : ''}<span class="comment-time">${timeAgo(c.ts)}</span></span>
-            <div class="comment-text">${c.text}</div>
-          </div>
-        </div>`).join('')
+    ? comments.slice().reverse().map(c => commentHTML(c, myVoterId, false)).join('')
     : `<div class="comment-empty">💬 Sé el primero en comentar este partido</div>`;
 
   body.innerHTML = `
@@ -1124,14 +1191,11 @@ async function renderCommentsTab(){
         <input type="text" class="comment-text-input" id="commentText" placeholder="Escribí un comentario..." maxlength="200">
         <button class="comment-send-btn" onclick="postComment()">➤</button>
       </div>
-      <div style="font-size:9.5px;color:var(--muted);">${savedName ? `Comentando como <strong style="color:var(--accent2);">${savedName}</strong> · ` : ''}Los comentarios son públicos y visibles para todos</div>
+      <div style="font-size:9.5px;color:var(--muted);">${savedName?`Comentando como <strong style="color:var(--accent2);">${savedName}</strong> · `:''}Los comentarios son públicos</div>
     </div>
-    <div class="comment-list" id="commentList">${list}</div>
+    <div class="comment-list">${list}</div>
   `;
-
-  document.getElementById('commentText').addEventListener('keydown', (e) => {
-    if(e.key === 'Enter') postComment();
-  });
+  document.getElementById('commentText').addEventListener('keydown',(e)=>{ if(e.key==='Enter') postComment(); });
 }
 
 async function postComment(){
@@ -1140,14 +1204,11 @@ async function postComment(){
   const name = nameInput.value.trim() || 'Hincha anónimo';
   const text = textInput.value.trim();
   if(!text){ toast('⚠️ Escribí algo primero'); return; }
-
   saveUsername(name);
-  const voterId = getVoterId();
-
-  const result = await fetchSTV(`/api/comments/${encodeURIComponent(currentMatchKey)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, text, voterId })
+  const result = await fetchSTV(`/api/comments/${encodeURIComponent(currentMatchKey)}`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name, text, voterId: getVoterId() })
   });
   if(!result){ toast('❌ No se pudo publicar. Verificá tu conexión.'); return; }
   textInput.value = '';
@@ -1155,17 +1216,46 @@ async function postComment(){
   renderCommentsTab();
 }
 
-// ── PESTAÑA COMUNIDAD ──
+// ── PESTAÑA COMUNIDAD — feed real de comentarios recientes ──
 async function loadCommunity(){
-  setStatus(false);
+  setStatus(true, 'Cargando comunidad...');
   document.getElementById('leagueFilters').style.display = 'none';
-  document.getElementById('content').innerHTML = `
-    <div class="hype-banner" style="margin-bottom:1rem;">
-      <div class="hype-icon">🔥</div>
-      <div class="hype-text">Tocá cualquier partido y votá quién gana, predecí el marcador o dejá tu comentario</div>
-    </div>
-    <div class="status-msg show"><p>⚽ Explorá los partidos en "En vivo", "Hoy" o "Mundial 2026"<br>y tocá uno para sumarte a la conversación.</p></div>
-  `;
+  document.getElementById('content').innerHTML = '';
+
+  const myVoterId = getVoterId();
+  const savedName = getSavedName();
+  const feed = await fetchSTV('/api/community/feed') || [];
+
+  setStatus(false);
+
+  let html = `
+    <div class="community-hdr">
+      <h2>🔥 Comunidad ShockTV</h2>
+      <p>Los últimos comentarios de todos los partidos</p>
+    </div>`;
+
+  if(!feed.length){
+    html += `<div class="feed-empty">
+      <p style="font-size:1.5rem;margin-bottom:8px;">💬</p>
+      <p>Todavía no hay comentarios.</p>
+      <p style="margin-top:6px;font-size:12px;">Entrá a un partido y sé el primero en comentar.</p>
+    </div>`;
+  } else {
+    html += feed.map(c => `
+      <div class="feed-item">
+        <div class="feed-match-tag">⚽ ${decodeURIComponent(c.matchKey||'').replace(/_vs_/,' vs ').replace(/_/g,' ').split('_noid')[0].split('_')[0] || 'Partido'}</div>
+        <div class="comment-item" style="margin-bottom:0;">
+          <div class="comment-avatar" style="${c.voterId===myVoterId?'background:var(--accent2);color:#0B0E14;':''}">${(c.name||'?').slice(0,2).toUpperCase()}</div>
+          <div class="comment-body" style="flex:1;">
+            <span class="comment-author">${c.name}${c.voterId===myVoterId?'<span style="color:var(--accent2);font-size:9px;"> (vos)</span>':''}<span class="comment-time">${timeAgo(c.ts)}</span></span>
+            <div class="comment-text">${c.text}</div>
+            ${(c.replies||[]).length ? `<div style="font-size:10px;color:var(--muted);margin-top:4px;">↩ ${c.replies.length} respuesta${c.replies.length>1?'s':''}</div>` : ''}
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  document.getElementById('content').innerHTML = html;
 }
 
 loadCurrentTab();
