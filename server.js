@@ -7,208 +7,182 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ── BASE DE DATOS SIMPLE EN ARCHIVO JSON ──
-// Railway borra el filesystem en cada redeploy, así que esto es para
-// pruebas. Para producción seria, lo ideal es migrar a una DB real
-// (Railway ofrece PostgreSQL gratis con poco esfuerzo de migración).
 const DB_FILE = path.join(__dirname, 'db.json');
 
 function loadDB(){
-  try{
-    return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-  }catch(e){
-    return { votes: {}, predictions: {}, comments: {} };
-  }
+  try{ return JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); }
+  catch(e){ return { votes:{}, predictions:{}, comments:{}, visitors:{}, totalVisits:0 }; }
 }
 
 function saveDB(db){
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+  fs.writeFileSync(DB_FILE, JSON.stringify(db));
 }
 
-// ── PRESENCIA EN VIVO (en memoria, no necesita persistir en disco) ──
-// Cada visitante manda un "heartbeat" cada 25s. Si no se recibe nada
-// de un visitorId en los últimos 60s, se considera desconectado.
-const activeViewers = new Map(); // visitorId -> timestamp último heartbeat
-const PRESENCE_TIMEOUT = 60000;
+// ── PRESENCIA EN VIVO ── (en memoria, se resetea si el server reinicia)
+const sessions = {}; // { sessionId: lastPing }
+const TIMEOUT = 90000; // 90s sin ping = desconectado
 
-function cleanupPresence(){
-  const now = Date.now();
-  for(const [id, ts] of activeViewers.entries()){
-    if(now - ts > PRESENCE_TIMEOUT) activeViewers.delete(id);
-  }
+function cleanSessions(){
+  const cutoff = Date.now() - TIMEOUT;
+  Object.keys(sessions).forEach(id => { if(sessions[id] < cutoff) delete sessions[id]; });
 }
 
-app.post('/api/presence/heartbeat', (req, res) => {
-  const { visitorId } = req.body;
-  if(!visitorId) return res.status(400).json({ error: 'Falta visitorId' });
-  activeViewers.set(visitorId, Date.now());
-  cleanupPresence();
-  res.json({ online: activeViewers.size });
-});
+// Ping cada 25s desde el navegador
+app.post('/api/presence/ping', (req, res) => {
+  const { sessionId, isNewVisit } = req.body;
+  if(!sessionId) return res.status(400).json({ error: 'Falta sessionId' });
 
-app.get('/api/presence/count', (req, res) => {
-  cleanupPresence();
-  res.json({ online: activeViewers.size });
-});
+  const isFirst = !sessions[sessionId];
+  sessions[sessionId] = Date.now();
+  cleanSessions();
 
-// ── VISITAS TOTALES (persistente, cuenta visitantes únicos reales) ──
-app.post('/api/visits/register', (req, res) => {
-  const { visitorId } = req.body;
-  if(!visitorId) return res.status(400).json({ error: 'Falta visitorId' });
-  const db = loadDB();
-  if(!db.uniqueVisitors) db.uniqueVisitors = {};
-  const isNew = !db.uniqueVisitors[visitorId];
-  if(isNew){
-    db.uniqueVisitors[visitorId] = Date.now();
-    saveDB(db);
+  if(isNewVisit && isFirst){
+    const db = loadDB();
+    if(!db.visitors) db.visitors = {};
+    if(!db.visitors[sessionId]){
+      db.visitors[sessionId] = Date.now();
+      db.totalVisits = (db.totalVisits || 0) + 1;
+      saveDB(db);
+    }
   }
-  const total = Object.keys(db.uniqueVisitors).length;
-  res.json({ total, isNew });
-});
 
-app.get('/api/visits/count', (req, res) => {
   const db = loadDB();
-  const total = db.uniqueVisitors ? Object.keys(db.uniqueVisitors).length : 0;
-  res.json({ total });
+  res.json({ online: Object.keys(sessions).length, totalVisits: db.totalVisits || 0 });
 });
 
+// ── ESTADO ──
 app.get('/', (req, res) => {
-  res.json({ status: 'ok', mensaje: '🚀 ShockTV Backend funcionando!' });
+  res.json({ status:'ok', mensaje:'🚀 ShockTV Backend funcionando!' });
 });
 
-// ── VOTOS (¿quién gana?) ──
-app.get('/api/votes/:matchKey', (req, res) => {
+// ── VOTOS ──
+app.get('/api/votes/:key', (req, res) => {
   const db = loadDB();
-  const v = db.votes[req.params.matchKey] || { home: 0, draw: 0, away: 0 };
-  res.json(v);
+  res.json(db.votes[req.params.key] || { home:0, draw:0, away:0 });
 });
 
-app.post('/api/votes/:matchKey', (req, res) => {
+app.post('/api/votes/:key', (req, res) => {
   const { choice, voterId } = req.body;
-  if(!['home','draw','away'].includes(choice)){
-    return res.status(400).json({ error: 'Voto inválido' });
-  }
+  if(!['home','draw','away'].includes(choice)) return res.status(400).json({ error:'Inválido' });
   const db = loadDB();
-  const key = req.params.matchKey;
-  if(!db.votes[key]) db.votes[key] = { home: 0, draw: 0, away: 0, voters: {} };
-  if(!db.votes[key].voters) db.votes[key].voters = {};
-
-  // Evitar doble voto del mismo visitante
-  if(voterId && db.votes[key].voters[voterId]){
-    return res.json({ ...db.votes[key], alreadyVoted: true, myVote: db.votes[key].voters[voterId] });
+  const k = req.params.key;
+  if(!db.votes[k]) db.votes[k] = { home:0, draw:0, away:0, voters:{} };
+  if(db.votes[k].voters && db.votes[k].voters[voterId]){
+    return res.json({ ...db.votes[k], alreadyVoted:true, myVote: db.votes[k].voters[voterId] });
   }
-
-  db.votes[key][choice] = (db.votes[key][choice] || 0) + 1;
-  if(voterId) db.votes[key].voters[voterId] = choice;
+  db.votes[k][choice] = (db.votes[k][choice]||0) + 1;
+  if(!db.votes[k].voters) db.votes[k].voters = {};
+  if(voterId) db.votes[k].voters[voterId] = choice;
   saveDB(db);
-  res.json({ ...db.votes[key], myVote: choice });
+  res.json({ ...db.votes[k], myVote: choice });
 });
 
-// ── PREDICCIONES DE MARCADOR ──
-app.get('/api/predictions/:matchKey', (req, res) => {
+// ── PREDICCIONES ──
+app.get('/api/predictions/:key', (req, res) => {
   const db = loadDB();
-  const p = db.predictions[req.params.matchKey] || { count: 0, voters: {} };
-  res.json({ count: p.count || 0 });
+  const p = db.predictions[req.params.key] || {};
+  res.json({ count: p.count||0 });
 });
 
-app.post('/api/predictions/:matchKey', (req, res) => {
+app.post('/api/predictions/:key', (req, res) => {
   const { home, away, voterId } = req.body;
   const db = loadDB();
-  const key = req.params.matchKey;
-  if(!db.predictions[key]) db.predictions[key] = { count: 0, voters: {} };
-  if(!db.predictions[key].voters) db.predictions[key].voters = {};
-
-  if(voterId && db.predictions[key].voters[voterId]){
-    return res.json({ count: db.predictions[key].count, alreadyPredicted: true, myPrediction: db.predictions[key].voters[voterId] });
+  const k = req.params.key;
+  if(!db.predictions[k]) db.predictions[k] = { count:0, voters:{} };
+  if(db.predictions[k].voters && db.predictions[k].voters[voterId]){
+    return res.json({ count: db.predictions[k].count, alreadyPredicted:true, myPrediction: db.predictions[k].voters[voterId] });
   }
-
-  db.predictions[key].count = (db.predictions[key].count || 0) + 1;
-  if(voterId) db.predictions[key].voters[voterId] = { home, away };
+  db.predictions[k].count = (db.predictions[k].count||0) + 1;
+  if(!db.predictions[k].voters) db.predictions[k].voters = {};
+  if(voterId) db.predictions[k].voters[voterId] = { home, away };
   saveDB(db);
-  res.json({ count: db.predictions[key].count, myPrediction: { home, away } });
+  res.json({ count: db.predictions[k].count, myPrediction:{ home, away } });
 });
 
-// ── COMENTARIOS ──
-app.get('/api/comments/:matchKey', (req, res) => {
+// ── COMENTARIOS (con respuestas anidadas, retrocompatible) ──
+// Estructura de un comentario:
+// { id, name, text, voterId, ts, replies: [{id,name,text,voterId,ts}] }
+
+function generateId(){
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+}
+
+// Obtener comentarios de un partido
+app.get('/api/comments/:key', (req, res) => {
   const db = loadDB();
-  const c = db.comments[req.params.matchKey] || [];
-  res.json(c.slice(-100));
+  let comments = db.comments[req.params.key] || [];
+  // Migración: comentarios viejos sin id/replies obtienen id y replies vacío
+  comments = comments.map(c => ({
+    id: c.id || generateId(),
+    name: c.name || 'Hincha anónimo',
+    text: c.text || '',
+    voterId: c.voterId || null,
+    ts: c.ts || Date.now(),
+    replies: c.replies || []
+  }));
+  res.json(comments.slice(-100));
 });
 
-app.post('/api/comments/:matchKey', (req, res) => {
+// Nuevo comentario
+app.post('/api/comments/:key', (req, res) => {
   const { name, text, voterId } = req.body;
-  if(!text || !text.trim()){
-    return res.status(400).json({ error: 'Comentario vacío' });
-  }
+  if(!text || !text.trim()) return res.status(400).json({ error:'Vacío' });
   const db = loadDB();
-  const key = req.params.matchKey;
-  if(!db.comments[key]) db.comments[key] = [];
+  const k = req.params.key;
+  if(!db.comments[k]) db.comments[k] = [];
 
   const comment = {
-    name: (name || 'Hincha anónimo').slice(0, 20),
-    text: text.slice(0, 200),
-    voterId: voterId || null,
-    ts: Date.now()
+    id: generateId(),
+    name: (name||'Hincha anónimo').slice(0,20),
+    text: text.slice(0,200),
+    voterId: voterId||null,
+    ts: Date.now(),
+    replies: []
   };
-  db.comments[key].push(comment);
-  if(db.comments[key].length > 200) db.comments[key].shift();
+  db.comments[k].push(comment);
+  if(db.comments[k].length > 200) db.comments[k].shift();
   saveDB(db);
   res.json(comment);
 });
 
-// ── PRESENCIA EN VIVO (visitantes reales conectados ahora) ──
-// Se considera "en línea" a cualquier sesión que hizo ping en los últimos 90s
-let onlineSessions = {}; // { sessionId: lastPingTimestamp }
-let totalVisitsCount = null;
-
-function loadVisitCount(){
+// Responder a un comentario
+app.post('/api/comments/:key/reply/:commentId', (req, res) => {
+  const { name, text, voterId } = req.body;
+  if(!text || !text.trim()) return res.status(400).json({ error:'Vacío' });
   const db = loadDB();
-  if(typeof db.totalVisits !== 'number') db.totalVisits = 0;
-  return db.totalVisits;
-}
+  const k = req.params.key;
+  const cid = req.params.commentId;
+  if(!db.comments[k]) return res.status(404).json({ error:'Partido no encontrado' });
 
-function saveVisitCount(n){
-  const db = loadDB();
-  db.totalVisits = n;
+  const comment = db.comments[k].find(c => c.id === cid);
+  if(!comment) return res.status(404).json({ error:'Comentario no encontrado' });
+  if(!comment.replies) comment.replies = [];
+
+  const reply = {
+    id: generateId(),
+    name: (name||'Hincha anónimo').slice(0,20),
+    text: text.slice(0,200),
+    voterId: voterId||null,
+    ts: Date.now()
+  };
+  comment.replies.push(reply);
+  if(comment.replies.length > 50) comment.replies.shift();
   saveDB(db);
-}
-
-if(totalVisitsCount === null) totalVisitsCount = loadVisitCount();
-
-app.post('/api/presence/ping', (req, res) => {
-  const { sessionId, isNewVisit } = req.body;
-  if(!sessionId) return res.status(400).json({ error: 'sessionId requerido' });
-
-  const isFirstPing = !onlineSessions[sessionId];
-  onlineSessions[sessionId] = Date.now();
-
-  if(isNewVisit && isFirstPing){
-    totalVisitsCount++;
-    saveVisitCount(totalVisitsCount);
-  }
-
-  // Limpiar sesiones inactivas (sin ping hace más de 90s)
-  const cutoff = Date.now() - 90000;
-  Object.keys(onlineSessions).forEach(sid => {
-    if(onlineSessions[sid] < cutoff) delete onlineSessions[sid];
-  });
-
-  res.json({
-    online: Object.keys(onlineSessions).length,
-    totalVisits: totalVisitsCount
-  });
+  res.json(reply);
 });
 
-app.get('/api/presence/stats', (req, res) => {
-  const cutoff = Date.now() - 90000;
-  Object.keys(onlineSessions).forEach(sid => {
-    if(onlineSessions[sid] < cutoff) delete onlineSessions[sid];
+// Obtener feed de comunidad: últimos comentarios de todos los partidos
+app.get('/api/community/feed', (req, res) => {
+  const db = loadDB();
+  const allComments = [];
+  Object.entries(db.comments || {}).forEach(([matchKey, comments]) => {
+    (comments||[]).slice(-5).forEach(c => {
+      allComments.push({ ...c, matchKey, replies: c.replies||[] });
+    });
   });
-  res.json({
-    online: Object.keys(onlineSessions).length,
-    totalVisits: totalVisitsCount
-  });
+  allComments.sort((a,b) => b.ts - a.ts);
+  res.json(allComments.slice(0,30));
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`🚀 ShockTV Backend corriendo en puerto ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 ShockTV Backend en puerto ${PORT}`));
