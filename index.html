@@ -1,1271 +1,152 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ShockTV — Resultados de fútbol en vivo</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#0B0E14;--card:#11151F;--card2:#161B27;--border:#222838;
-  --text:#F4F6FB;--muted:#8A93A6;--accent:#FF3D5A;--accent2:#22D3A8;
-  --live:#FF3D5A;--gold:#F5B843;--blue:#3B82F6;--r:14px;
-}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
-header{background:#0E1119;border-bottom:1px solid var(--border);padding:0 1.25rem;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
-.logo{font-family:'Space Grotesk',sans-serif;font-size:1.3rem;font-weight:700;display:flex;align-items:center;gap:7px;}
-.logo .dot{color:var(--accent);}
-.header-right{display:flex;align-items:center;gap:10px;}
-.live-pill{display:flex;align-items:center;gap:6px;background:rgba(255,61,90,0.12);border:1px solid rgba(255,61,90,0.3);color:#FF8095;padding:5px 12px;border-radius:50px;font-size:11px;font-weight:600;}
-.live-dot{width:6px;height:6px;border-radius:50%;background:var(--live);animation:pulse 1.4s infinite;}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
-.search-box{display:none;}
-@media(min-width:640px){.search-box{display:flex;align-items:center;background:var(--card2);border:1px solid var(--border);border-radius:50px;padding:6px 14px;gap:8px;width:220px;}
-.search-box input{background:none;border:none;outline:none;color:var(--text);font-size:13px;width:100%;}}
-
-.tabs-row{display:none;gap:6px;padding:0.85rem 1.25rem;overflow-x:auto;background:#0E1119;border-bottom:1px solid var(--border);-webkit-overflow-scrolling:touch;}
-@media(min-width:640px){.tabs-row{display:flex;}}
-.tabs-row::-webkit-scrollbar{display:none;}
-.tab{flex-shrink:0;font-size:12.5px;font-weight:500;color:var(--muted);background:var(--card2);border:1px solid var(--border);padding:7px 16px;border-radius:50px;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
-.tab:hover{border-color:#3a4357;}
-.tab.active{background:var(--text);color:#0B0E14;border-color:var(--text);}
-
-main{max-width:760px;margin:0 auto;padding:1.25rem;}
-
-.league-filters{display:flex;gap:6px;margin-bottom:1.25rem;overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.league-filters::-webkit-scrollbar{display:none;}
-.lf{flex-shrink:0;font-size:11.5px;color:var(--muted);background:var(--card);border:1px solid var(--border);padding:5px 12px;border-radius:50px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px;}
-.lf.active{background:rgba(34,211,168,0.1);color:var(--accent2);border-color:rgba(34,211,168,0.35);}
-
-.status-msg{text-align:center;padding:3rem 1rem;color:var(--muted);font-size:13px;display:none;}
-.status-msg.show{display:block;}
-.spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent2);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 1rem;}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-.league-group{margin-bottom:1.5rem;}
-.league-head{display:flex;align-items:center;gap:8px;margin-bottom:0.6rem;padding:0 2px;}
-.league-head img{width:18px;height:18px;border-radius:4px;object-fit:contain;background:var(--card2);}
-.league-head h3{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;}
-
-.match-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:0.9rem 1.1rem;margin-bottom:8px;cursor:pointer;transition:border-color 0.15s,transform 0.1s;}
-.match-card:hover{border-color:#39435a;transform:translateY(-1px);}
-.match-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-.match-status{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:50px;}
-.status-live{background:rgba(255,61,90,0.15);color:#FF8095;}
-.status-ft{background:var(--card2);color:var(--muted);}
-.status-ns{background:rgba(59,130,246,0.12);color:#7DA8F5;}
-.match-date{font-size:10.5px;color:var(--muted);}
-
-.teams-row{display:flex;align-items:center;gap:10px;}
-.team-col{flex:1;display:flex;align-items:center;gap:9px;min-width:0;}
-.team-col.away{flex-direction:row-reverse;text-align:right;}
-.crest{width:26px;height:26px;border-radius:6px;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;object-fit:contain;}
-.team-name{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.score-col{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:54px;}
-.score-num{font-family:'Space Grotesk',sans-serif;font-size:1.15rem;font-weight:700;}
-.score-vs{font-size:12px;color:var(--muted);font-weight:500;}
-.time-text{font-size:13px;font-weight:600;color:var(--text);}
-
-.standings-table{width:100%;border-collapse:collapse;font-size:12px;}
-.standings-table th{text-align:left;color:var(--muted);font-weight:500;padding:8px 6px;font-size:10.5px;text-transform:uppercase;border-bottom:1px solid var(--border);}
-.standings-table td{padding:8px 6px;border-bottom:1px solid var(--border);}
-.standings-table tr:last-child td{border-bottom:none;}
-.pos-cell{display:flex;align-items:center;gap:8px;}
-.pos-num{width:18px;text-align:center;font-weight:600;color:var(--muted);}
-.team-cell{display:flex;align-items:center;gap:8px;}
-.team-cell img{width:18px;height:18px;border-radius:4px;object-fit:contain;}
-.num-cell{text-align:center;color:var(--muted);}
-.pts-cell{text-align:center;font-weight:700;color:var(--text);}
-
-footer{text-align:center;padding:2rem 1rem;color:var(--muted);font-size:11px;border-top:1px solid var(--border);margin-top:1rem;}
-footer strong{color:var(--text);}
-
-.refresh-fab{position:fixed;bottom:5.5rem;right:1.25rem;width:46px;height:46px;border-radius:50%;background:var(--accent2);color:#0B0E14;border:none;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;box-shadow:0 4px 16px rgba(34,211,168,0.3);z-index:50;}
-@media(min-width:640px){.refresh-fab{bottom:1.5rem;}}
-.refresh-fab.spinning svg{animation:spin 0.7s linear infinite;}
-
-.wc-banner{background:linear-gradient(135deg,#0B3D2E 0%,#0E1119 100%);border:1px solid rgba(34,211,168,0.25);border-radius:var(--r);padding:1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:1rem;}
-.wc-banner-icon{font-size:2.2rem;flex-shrink:0;}
-.wc-banner h2{font-family:'Space Grotesk',sans-serif;font-size:1.05rem;font-weight:700;margin-bottom:3px;}
-.wc-banner p{font-size:11.5px;color:var(--muted);line-height:1.5;}
-.wc-host-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;}
-.wc-chip{font-size:10.5px;background:rgba(34,211,168,0.1);border:1px solid rgba(34,211,168,0.25);color:var(--accent2);padding:2px 9px;border-radius:50px;}
-.wc-group-head{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px;margin:1.1rem 0 0.6rem;}
-
-.goal-ticker{background:linear-gradient(90deg,rgba(255,61,90,0.12),rgba(255,61,90,0.02));border:1px solid rgba(255,61,90,0.25);border-radius:50px;padding:8px 16px;margin-bottom:1.1rem;display:flex;align-items:center;gap:10px;overflow:hidden;}
-.goal-ticker-icon{flex-shrink:0;font-size:14px;}
-.goal-ticker-track{flex:1;overflow:hidden;white-space:nowrap;position:relative;height:16px;}
-.goal-ticker-inner{display:inline-block;animation:ticker 22s linear infinite;font-size:12px;color:#FF9FAE;}
-.goal-ticker-inner span{margin-right:32px;}
-@keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-
-.pulse-stats{display:flex;gap:0;background:var(--card);border:1px solid var(--border);border-radius:var(--r);margin-bottom:1.1rem;overflow:hidden;}
-.pulse-stat{flex:1;text-align:center;padding:0.7rem 0.5rem;border-right:1px solid var(--border);}
-.pulse-stat:last-child{border-right:none;}
-.pulse-stat-num{font-family:'Space Grotesk',sans-serif;font-size:1.15rem;font-weight:700;color:var(--accent2);}
-.pulse-stat-lbl{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-top:1px;}
-
-.hype-banner{background:linear-gradient(135deg,rgba(245,184,67,0.1),rgba(245,184,67,0.02));border:1px solid rgba(245,184,67,0.3);border-radius:var(--r);padding:0.85rem 1.1rem;margin-bottom:1.1rem;display:flex;align-items:center;gap:10px;}
-.hype-icon{font-size:1.3rem;flex-shrink:0;}
-.hype-text{font-size:12px;color:var(--gold);font-weight:500;}
-.hype-text strong{color:var(--text);}
-
-.match-card{position:relative;}
-.match-card.is-live::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);border-radius:3px 0 0 3px;}
-.click-hint{font-size:9.5px;color:var(--muted);text-align:center;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:4px;}
-
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:999;align-items:flex-end;justify-content:center;}
-.modal-overlay.open{display:flex;}
-@media(min-width:640px){.modal-overlay{align-items:center;}}
-.modal-box{background:var(--card);border:1px solid var(--border);border-radius:18px 18px 0 0;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;animation:slideUp 0.25s ease;}
-@media(min-width:640px){.modal-box{border-radius:18px;}}
-@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
-.modal-head{position:sticky;top:0;background:var(--card);padding:1.1rem 1.25rem 0.9rem;border-bottom:1px solid var(--border);}
-.modal-close{position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:50%;background:var(--card2);border:none;color:var(--muted);font-size:14px;cursor:pointer;}
-.modal-teams{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:6px;}
-.modal-team{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;}
-.modal-team .crest{width:38px;height:38px;border-radius:8px;font-size:14px;}
-.modal-team-name{font-size:12px;font-weight:600;text-align:center;}
-.modal-score{font-family:'Space Grotesk',sans-serif;font-size:1.6rem;font-weight:700;}
-.modal-tabs{display:flex;gap:4px;padding:0.9rem 1.25rem 0;overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.modal-tabs::-webkit-scrollbar{display:none;}
-.modal-tab{flex-shrink:0;font-size:11.5px;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;padding:8px 6px;cursor:pointer;white-space:nowrap;}
-.modal-tab.active{color:var(--accent2);border-bottom-color:var(--accent2);font-weight:600;}
-.modal-body{padding:1rem 1.25rem 1.5rem;}
-
-.lineup-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
-.lineup-col h4{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.6rem;}
-.lineup-player{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:12px;border-bottom:1px solid var(--border);}
-.lineup-player:last-child{border-bottom:none;}
-.lineup-photo{width:32px;height:32px;border-radius:50%;background:var(--card2);object-fit:cover;flex-shrink:0;border:1px solid var(--border);}
-.lineup-photo-fallback{width:32px;height:32px;border-radius:50%;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--muted);flex-shrink:0;border:1px solid var(--border);}
-.lineup-info{min-width:0;}
-.lineup-name{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;}
-.lineup-meta{display:flex;align-items:center;gap:5px;margin-top:1px;}
-.lineup-num{font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:700;color:var(--accent2);}
-.lineup-pos{font-size:9.5px;color:var(--muted);background:var(--card2);padding:1px 6px;border-radius:50px;}
-
-.timeline-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
-.timeline-item:last-child{border-bottom:none;}
-.timeline-min{font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;color:var(--accent2);min-width:32px;}
-.timeline-icon{font-size:13px;flex-shrink:0;}
-.timeline-text{font-size:12px;}
-.timeline-text strong{font-weight:600;}
-
-.empty-tab-msg{text-align:center;padding:2rem 1rem;color:var(--muted);font-size:12px;}
-
-/* Votación / encuesta */
-.vote-section{margin-bottom:1.5rem;}
-.vote-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.7rem;display:flex;align-items:center;gap:6px;}
-.vote-bars{display:flex;flex-direction:column;gap:8px;}
-.vote-option{cursor:pointer;border:1px solid var(--border);border-radius:10px;padding:10px 12px;position:relative;overflow:hidden;background:var(--card2);transition:border-color 0.15s;}
-.vote-option:hover{border-color:var(--accent2);}
-.vote-option.voted{cursor:default;}
-.vote-fill{position:absolute;left:0;top:0;bottom:0;background:rgba(34,211,168,0.13);transition:width 0.5s ease;z-index:0;}
-.vote-option-row{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.vote-option-name{font-size:12.5px;font-weight:500;display:flex;align-items:center;gap:7px;}
-.vote-option-name img{width:18px;height:18px;border-radius:4px;object-fit:contain;}
-.vote-option-pct{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--accent2);}
-.vote-total{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:center;}
-
-/* Predicción de marcador */
-.predict-box{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:1.5rem;}
-.predict-row{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:0.9rem;}
-.predict-team{font-size:11px;color:var(--muted);text-align:center;width:70px;}
-.predict-input{width:48px;height:48px;text-align:center;font-family:'Space Grotesk',sans-serif;font-size:1.3rem;font-weight:700;background:var(--card);border:1.5px solid var(--border);border-radius:10px;color:var(--text);outline:none;}
-.predict-input:focus{border-color:var(--accent2);}
-.predict-sep{font-size:1.2rem;color:var(--muted);font-weight:700;}
-.predict-btn{width:100%;background:var(--accent2);color:#0B0E14;border:none;padding:10px;border-radius:10px;font-size:12.5px;font-weight:700;cursor:pointer;}
-.predict-btn:disabled{background:var(--border);color:var(--muted);cursor:not-allowed;}
-.predict-done{text-align:center;font-size:12px;color:var(--accent2);padding:8px;background:rgba(34,211,168,0.08);border-radius:8px;}
-.predict-stats{display:flex;justify-content:center;gap:18px;margin-top:0.9rem;padding-top:0.9rem;border-top:1px solid var(--border);}
-.predict-stat{text-align:center;}
-.predict-stat-num{font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:700;}
-.predict-stat-lbl{font-size:9.5px;color:var(--muted);text-transform:uppercase;}
-
-/* Comentarios */
-.comment-form{display:flex;flex-direction:column;gap:8px;margin-bottom:1.25rem;}
-.comment-input-row{display:flex;gap:6px;}
-.comment-name-input{width:90px;flex-shrink:0;background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:0 10px;font-size:12px;color:var(--text);outline:none;height:38px;font-family:'Inter',sans-serif;}
-.comment-text-input{flex:1;background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:0 12px;font-size:12.5px;color:var(--text);outline:none;height:38px;font-family:'Inter',sans-serif;min-width:0;}
-.comment-send-btn{background:var(--accent2);color:#0B0E14;border:none;width:38px;height:38px;border-radius:9px;font-size:15px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
-.comment-send-btn:disabled{background:var(--border);color:var(--muted);}
-.comment-list{display:flex;flex-direction:column;gap:10px;}
-.comment-item{display:flex;gap:9px;}
-.comment-avatar{width:30px;height:30px;border-radius:50%;background:var(--accent2);color:#0B0E14;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
-.comment-body{flex:1;background:var(--card2);border-radius:10px;padding:8px 11px;min-width:0;}
-.comment-author{font-size:11.5px;font-weight:600;}
-.comment-time{font-size:9.5px;color:var(--muted);font-weight:400;margin-left:5px;}
-.comment-text{font-size:12px;color:var(--text);margin-top:2px;word-wrap:break-word;}
-.comment-empty{text-align:center;padding:1.5rem 0.5rem;color:var(--muted);font-size:12px;}
-
-/* ── MENÚ INFERIOR TIPO APP ── */
-body{padding-bottom:72px;}
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#0E1119;border-top:1px solid var(--border);display:flex;z-index:150;padding-bottom:env(safe-area-inset-bottom,0);}
-.bn-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px 8px;cursor:pointer;color:var(--muted);background:none;border:none;font-family:'Inter',sans-serif;position:relative;}
-.bn-item.active{color:var(--accent2);}
-.bn-icon{font-size:19px;line-height:1;}
-.bn-label{font-size:9.5px;font-weight:500;}
-.bn-badge{position:absolute;top:4px;right:calc(50% - 18px);background:var(--accent);color:white;font-size:8px;font-weight:700;min-width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0 3px;}
-@media(min-width:640px){.bottom-nav{display:none;}body{padding-bottom:0;}}
-.comment-reply-btn{background:none;border:none;color:var(--muted);font-size:10.5px;cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:4px;font-family:'Inter',sans-serif;}
-.comment-reply-btn:hover{color:var(--accent2);}
-.comment-replies{margin-top:8px;padding-left:12px;border-left:2px solid var(--border);display:flex;flex-direction:column;gap:8px;}
-.reply-item{display:flex;gap:7px;}
-.reply-avatar{width:22px;height:22px;border-radius:50%;background:rgba(34,211,168,0.2);color:var(--accent2);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0;}
-.reply-body{flex:1;background:var(--card2);border-radius:8px;padding:6px 9px;min-width:0;}
-.reply-form{margin-top:6px;display:none;flex-direction:column;gap:5px;}
-.reply-form.open{display:flex;}
-.reply-input-row{display:flex;gap:5px;}
-.reply-input{flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:0 10px;height:32px;font-size:12px;color:var(--text);outline:none;font-family:'Inter',sans-serif;min-width:0;}
-.reply-send{background:var(--accent2);color:#0B0E14;border:none;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;flex-shrink:0;}
-.community-hdr{margin-bottom:1rem;}
-.community-hdr h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;}
-.community-hdr p{font-size:11px;color:var(--muted);margin-top:2px;}
-.feed-item{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1rem;margin-bottom:10px;}
-.feed-match-tag{font-size:10.5px;color:var(--accent2);background:rgba(34,211,168,0.08);border:1px solid rgba(34,211,168,0.2);padding:2px 9px;border-radius:50px;display:inline-block;margin-bottom:8px;cursor:pointer;}
-.feed-match-tag:hover{background:rgba(34,211,168,0.15);}
-.feed-empty{text-align:center;padding:3rem 1rem;color:var(--muted);font-size:13px;}
-.community-compose{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1rem;margin-bottom:1rem;}
-.community-compose-title{font-size:11px;color:var(--muted);margin-bottom:8px;}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShockTV</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-<header>
-  <div class="logo">📡 Shock<span class="dot">TV</span></div>
-  <div class="header-right">
-    <div class="search-box">
-      <span style="font-size:13px;">🔍</span>
-      <input type="text" id="teamSearch" placeholder="Buscar equipo...">
-    </div>
-    <div class="live-pill"><div class="live-dot"></div> EN VIVO</div>
-  </div>
-</header>
-
-<div class="tabs-row" id="desktopTabs">
-  <div class="tab active" data-tab="worldcup">🏆 Mundial 2026</div>
-  <div class="tab" data-tab="live">En vivo</div>
-  <div class="tab" data-tab="today">Hoy</div>
-  <div class="tab" data-tab="standings">Posiciones</div>
-</div>
-
-<main>
-  <div class="goal-ticker" id="goalTicker">
-    <span class="goal-ticker-icon">⚽</span>
-    <div class="goal-ticker-track">
-      <div class="goal-ticker-inner" id="goalTickerInner">Cargando últimos goles...</div>
-    </div>
-  </div>
-
-  <div class="pulse-stats">
-    <div class="pulse-stat">
-      <div class="pulse-stat-num" id="onlineNow">—</div>
-      <div class="pulse-stat-lbl">Viendo ahora</div>
-    </div>
-    <div class="pulse-stat">
-      <div class="pulse-stat-num" id="totalVisits">—</div>
-      <div class="pulse-stat-lbl">Visitas totales</div>
-    </div>
-    <div class="pulse-stat">
-      <div class="pulse-stat-num" id="liveCount">—</div>
-      <div class="pulse-stat-lbl">Partidos en vivo</div>
-    </div>
-  </div>
-
-  <div class="hype-banner" id="hypeBanner">
-    <div class="hype-icon">🔥</div>
-    <div class="hype-text">Faltan <strong id="wcCountdown">...</strong> para el próximo partido del Mundial</div>
-  </div>
-
-  <div class="league-filters" id="leagueFilters" style="display:none;">
-    <div class="lf active" data-league="all">🌍 Todas</div>
-    <div class="lf" data-league="4328">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</div>
-    <div class="lf" data-league="4335">🇪🇸 LaLiga</div>
-    <div class="lf" data-league="4480">🇦🇷 Liga Arg.</div>
-    <div class="lf" data-league="4331">🇩🇪 Bundesliga</div>
-    <div class="lf" data-league="4332">🇮🇹 Serie A</div>
-    <div class="lf" data-league="4334">🇫🇷 Ligue 1</div>
-    <div class="lf" data-league="4480">🇧🇷 Brasileirão</div>
-  </div>
-
-  <div id="content"></div>
-
-  <div class="status-msg" id="statusMsg">
-    <div class="spinner"></div>
-    <p>Cargando partidos...</p>
-  </div>
-</main>
-
-<div class="modal-overlay" id="modalOverlay">
-  <div class="modal-box">
-    <div class="modal-head">
-      <button class="modal-close" id="modalClose">✕</button>
-      <div style="font-size:11px;color:var(--muted);text-align:center;" id="modalLeague"></div>
-      <div class="modal-teams" id="modalTeams"></div>
-    </div>
-    <div class="modal-tabs">
-      <button class="modal-tab active" data-mtab="timeline">Minuto a minuto</button>
-      <button class="modal-tab" data-mtab="lineup">Alineaciones</button>
-      <button class="modal-tab" data-mtab="vote">🔥 Votá</button>
-      <button class="modal-tab" data-mtab="comments">💬 Comentarios</button>
-    </div>
-    <div class="modal-body" id="modalBody"></div>
-  </div>
-</div>
-
-<button class="refresh-fab" id="refreshBtn" title="Actualizar">
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-</button>
-
-<footer><strong>ShockTV</strong> · Resultados y estadísticas de fútbol en vivo · Datos provistos por TheSportsDB</footer>
-
-<nav class="bottom-nav" id="bottomNav">
-  <button class="bn-item active" data-tab="worldcup">
-    <span class="bn-icon">🏆</span><span class="bn-label">Mundial</span>
-  </button>
-  <button class="bn-item" data-tab="live">
-    <span class="bn-icon">📡</span><span class="bn-label">En vivo</span>
-  </button>
-  <button class="bn-item" data-tab="today">
-    <span class="bn-icon">📅</span><span class="bn-label">Hoy</span>
-  </button>
-  <button class="bn-item" data-tab="standings">
-    <span class="bn-icon">📊</span><span class="bn-label">Posiciones</span>
-  </button>
-  <button class="bn-item" data-tab="community">
-    <span class="bn-icon">🔥</span><span class="bn-label">Comunidad</span>
-  </button>
-</nav>
-
-<script>
-const API_KEY = '123';
-const BASE = 'https://www.thesportsdb.com/api/v1/json/' + API_KEY;
-
-// ── Backend propio ShockTV: votos, predicciones y comentarios reales ──
-const SHOCKTV_API = 'https://shocktv-production.up.railway.app';
-
-function getVoterId(){
-  let id = localStorage.getItem('shocktv_voter_id');
-  if(!id){
-    id = 'v_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
-    try{ localStorage.setItem('shocktv_voter_id', id); }catch(e){}
-  }
-  return id;
-}
-
-// ── football-data.org: resultados y posiciones más confiables ──
-const FD_TOKEN = 'afb62e9aa1704cd1859d91da698bd313';
-const FD_BASE = 'https://api.football-data.org/v4';
-const FD_CODES = {
-  '4328':'PL','4335':'PD','4331':'BL1','4332':'SA','4334':'FL1','4480':null
-};
-let fdAvailable = true;
-
-async function fetchFD(path){
-  try{
-    const res = await fetch(FD_BASE + path, { headers: { 'X-Auth-Token': FD_TOKEN } });
-    if(!res.ok) throw new Error('HTTP ' + res.status);
-    return await res.json();
-  }catch(e){
-    console.warn('football-data.org no disponible (CORS o límite), usando TheSportsDB como respaldo', e);
-    fdAvailable = false;
-    return null;
-  }
-}
-
-const LEAGUE_NAMES = {
-  '4328':'Premier League','4335':'LaLiga','4331':'Bundesliga',
-  '4332':'Serie A','4334':'Ligue 1','4480':'Liga Profesional Argentina'
-};
-const WORLD_CUP_ID = '4429';
-const WORLD_CUP_SEASON = '2025-2026';
-
-let currentTab = 'worldcup';
-let currentLeague = 'all';
-
-function setStatus(show, text){
-  const el = document.getElementById('statusMsg');
-  el.classList.toggle('show', show);
-  if(text) el.querySelector('p').textContent = text;
-}
-
-function crestImg(url, fallback){
-  if(url) return `<img class="crest" src="${url}" alt="" onerror="this.style.display='none'">`;
-  return `<div class="crest">${fallback}</div>`;
-}
-
-async function fetchJSON(url){
-  try{
-    const res = await fetch(url);
-    if(!res.ok) throw new Error('HTTP ' + res.status);
-    return await res.json();
-  }catch(e){
-    console.error('Error fetching', url, e);
-    return null;
-  }
-}
-
-async function loadLive(){
-  setStatus(true, 'Buscando partidos en vivo...');
-  document.getElementById('content').innerHTML = '';
-
-  const leagues = currentLeague === 'all' ? Object.keys(LEAGUE_NAMES) : [currentLeague];
-  let allEvents = [];
-
-  for(const lid of leagues){
-    const data = await fetchJSON(`${BASE}/eventsnextleague.php?id=${lid}`);
-    if(data && data.events){
-      allEvents = allEvents.concat(data.events.map(e => ({...e, _league: lid})));
-    }
-  }
-
-  setStatus(false);
-
-  if(!allEvents.length){
-    document.getElementById('content').innerHTML = `<div class="status-msg show"><p>⚽ No hay partidos en vivo en este momento.<br><br>Probá la pestaña "Hoy" para ver los próximos partidos.</p></div>`;
-    return;
-  }
-
-  renderMatches(allEvents, 'live');
-}
-
-async function loadToday(){
-  setStatus(true, 'Cargando partidos de hoy...');
-  document.getElementById('content').innerHTML = '';
-
-  const today = new Date().toISOString().split('T')[0];
-  const leagues = currentLeague === 'all' ? Object.keys(LEAGUE_NAMES) : [currentLeague];
-
-  // Intentar primero con football-data.org (resultados más confiables)
-  const fdLeagues = leagues.filter(l => FD_CODES[l]);
-  if(fdLeagues.length){
-    const fdCodes = fdLeagues.map(l => FD_CODES[l]).join(',');
-    const fdData = await fetchFD(`/matches?competitions=${fdCodes}&dateFrom=${today}&dateTo=${today}`);
-    if(fdData && fdData.matches && fdData.matches.length){
-      setStatus(false);
-      renderFDMatches(fdData.matches);
-      return;
-    }
-  }
-
-  // Fallback: TheSportsDB
-  let allEvents = [];
-
-  for(const lid of leagues){
-    const data = await fetchJSON(`${BASE}/eventsday.php?d=${today}&l=${LEAGUE_NAMES[lid].replace(/ /g,'_')}`);
-    if(data && data.events){
-      allEvents = allEvents.concat(data.events.map(e => ({...e, _league: lid})));
-    }
-  }
-
-  if(!allEvents.length){
-    for(const lid of leagues){
-      const data = await fetchJSON(`${BASE}/eventsnextleague.php?id=${lid}`);
-      if(data && data.events){
-        allEvents = allEvents.concat(data.events.slice(0,5).map(e => ({...e, _league: lid})));
-      }
-    }
-  }
-
-  setStatus(false);
-
-  if(!allEvents.length){
-    document.getElementById('content').innerHTML = `<div class="status-msg show"><p>No se encontraron partidos. Intentá con otra liga.</p></div>`;
-    return;
-  }
-
-  renderMatches(allEvents, 'today');
-}
-
-function renderFDMatches(matches){
-  const grouped = {};
-  matches.forEach(m => {
-    const comp = m.competition.name;
-    if(!grouped[comp]) grouped[comp] = [];
-    grouped[comp].push(m);
-  });
-
-  let html = `<div style="font-size:10.5px;color:var(--accent2);margin-bottom:10px;display:flex;align-items:center;gap:5px;">⚡ Datos en tiempo real · football-data.org</div>`;
-
-  for(const comp of Object.keys(grouped)){
-    html += `<div class="league-group"><div class="league-head"><h3>${comp}</h3></div>`;
-    grouped[comp].forEach(m => {
-      const hasScore = m.score.fullTime.home !== null && m.score.fullTime.away !== null;
-      const status = m.status;
-      const isLive = ['IN_PLAY','PAUSED'].includes(status);
-      const isFT = status === 'FINISHED';
-      let badge = '';
-      if(isLive) badge = `<span class="match-status status-live">● ${status === 'PAUSED' ? 'ENTRETIEMPO' : 'EN VIVO'}</span>`;
-      else if(isFT) badge = `<span class="match-status status-ft">FINALIZADO</span>`;
-      else badge = `<span class="match-status status-ns">PROGRAMADO</span>`;
-      const time = new Date(m.utcDate).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
-      html += `
-        <div class="match-card${isLive ? ' is-live' : ''}">
-          <div class="match-top">${badge}<span class="match-date">${time}</span></div>
-          <div class="teams-row">
-            <div class="team-col">
-              ${crestImg(m.homeTeam.crest, (m.homeTeam.shortName||'?').slice(0,2).toUpperCase())}
-              <span class="team-name">${m.homeTeam.shortName || m.homeTeam.name}</span>
-            </div>
-            <div class="score-col">
-              ${hasScore ? `<div class="score-num">${m.score.fullTime.home} - ${m.score.fullTime.away}</div>` : `<div class="time-text">${time}</div>`}
-            </div>
-            <div class="team-col away">
-              ${crestImg(m.awayTeam.crest, (m.awayTeam.shortName||'?').slice(0,2).toUpperCase())}
-              <span class="team-name">${m.awayTeam.shortName || m.awayTeam.name}</span>
-            </div>
-          </div>
-        </div>`;
-    });
-    html += `</div>`;
-  }
-
-  document.getElementById('content').innerHTML = html;
-}
-
-function renderMatches(events, mode){
-  const grouped = {};
-  events.forEach(e => {
-    const lid = e._league;
-    if(!grouped[lid]) grouped[lid] = [];
-    grouped[lid].push(e);
-  });
-
-  let html = '';
-  for(const lid of Object.keys(grouped)){
-    html += `<div class="league-group">
-      <div class="league-head"><h3>${LEAGUE_NAMES[lid] || 'Liga'}</h3></div>`;
-
-    grouped[lid].forEach(e => {
-      const homeScore = e.intHomeScore !== null && e.intHomeScore !== undefined ? e.intHomeScore : null;
-      const awayScore = e.intAwayScore !== null && e.intAwayScore !== undefined ? e.intAwayScore : null;
-      const hasScore = homeScore !== null && awayScore !== null;
-      const status = e.strStatus || '';
-      const isLive = ['1H','2H','HT','LIVE'].some(s => status.toUpperCase().includes(s));
-      const isFT = status.toUpperCase().includes('FT') || status.toUpperCase().includes('MATCH FINISHED');
-
-      let statusBadge = '';
-      if(isLive) statusBadge = `<span class="match-status status-live">● ${status || 'EN VIVO'}</span>`;
-      else if(isFT) statusBadge = `<span class="match-status status-ft">FINALIZADO</span>`;
-      else statusBadge = `<span class="match-status status-ns">PROGRAMADO</span>`;
-
-      const dateStr = e.dateEvent || '';
-      const timeStr = e.strTime ? e.strTime.slice(0,5) : '';
-
-      html += `
-        <div class="match-card">
-          <div class="match-top">
-            ${statusBadge}
-            <span class="match-date">${dateStr}${timeStr ? ' · ' + timeStr : ''}</span>
-          </div>
-          <div class="teams-row">
-            <div class="team-col">
-              ${crestImg(e.strHomeTeamBadge, (e.strHomeTeam||'?').slice(0,2).toUpperCase())}
-              <span class="team-name">${e.strHomeTeam || 'Equipo local'}</span>
-            </div>
-            <div class="score-col">
-              ${hasScore
-                ? `<div class="score-num">${homeScore} - ${awayScore}</div>`
-                : `<div class="time-text">${timeStr || 'vs'}</div>`}
-            </div>
-            <div class="team-col away">
-              ${crestImg(e.strAwayTeamBadge, (e.strAwayTeam||'?').slice(0,2).toUpperCase())}
-              <span class="team-name">${e.strAwayTeam || 'Equipo visitante'}</span>
-            </div>
-          </div>
-        </div>`;
-    });
-
-    html += `</div>`;
-  }
-
-  document.getElementById('content').innerHTML = html;
-}
-
-async function loadStandings(){
-  setStatus(true, 'Cargando tabla de posiciones...');
-  document.getElementById('content').innerHTML = '';
-
-  const lid = currentLeague === 'all' ? '4328' : currentLeague;
-  const fdCode = FD_CODES[lid];
-
-  // Intentar primero con football-data.org (más confiable)
-  if(fdCode){
-    const fdData = await fetchFD(`/competitions/${fdCode}/standings`);
-    if(fdData && fdData.standings && fdData.standings.length){
-      setStatus(false);
-      const table = fdData.standings.find(s => s.type === 'TOTAL') || fdData.standings[0];
-      const rows = table.table.map(t => `
-        <tr>
-          <td><div class="pos-cell"><span class="pos-num">${t.position}</span></div></td>
-          <td><div class="team-cell">${t.team.crest ? `<img src="${t.team.crest}" alt="" onerror="this.style.display='none'">` : ''}<span>${t.team.shortName || t.team.name}</span></div></td>
-          <td class="num-cell">${t.playedGames}</td>
-          <td class="num-cell">${t.won}</td>
-          <td class="num-cell">${t.draw}</td>
-          <td class="num-cell">${t.lost}</td>
-          <td class="pts-cell">${t.points}</td>
-        </tr>`).join('');
-      document.getElementById('content').innerHTML = `
-        <div style="font-size:10.5px;color:var(--accent2);margin-bottom:8px;display:flex;align-items:center;gap:5px;">⚡ Datos en tiempo real · football-data.org</div>
-        <table class="standings-table">
-          <thead><tr><th>#</th><th>Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>Pts</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>`;
-      return;
-    }
-  }
-
-  // Fallback: TheSportsDB
-  const season = '2025-2026';
-  const data = await fetchJSON(`${BASE}/lookuptable.php?l=${lid}&s=${season}`);
-
-  setStatus(false);
-
-  if(!data || !data.table){
-    document.getElementById('content').innerHTML = `<div class="status-msg show"><p>No hay tabla de posiciones disponible para esta liga todavía.</p></div>`;
-    return;
-  }
-
-  let rows = data.table.map(t => `
-    <tr>
-      <td><div class="pos-cell"><span class="pos-num">${t.intRank}</span></div></td>
-      <td><div class="team-cell">${t.strBadge ? `<img src="${t.strBadge}" alt="" onerror="this.style.display='none'">` : ''}<span>${t.strTeam}</span></div></td>
-      <td class="num-cell">${t.intPlayed}</td>
-      <td class="num-cell">${t.intWin}</td>
-      <td class="num-cell">${t.intDraw}</td>
-      <td class="num-cell">${t.intLoss}</td>
-      <td class="pts-cell">${t.intPoints}</td>
-    </tr>`).join('');
-
-  document.getElementById('content').innerHTML = `
-    <table class="standings-table">
-      <thead>
-        <tr><th>#</th><th>Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>Pts</th></tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-}
-
-async function loadWorldCup(){
-  setStatus(true, 'Cargando datos del Mundial 2026...');
-  document.getElementById('content').innerHTML = '';
-  document.getElementById('leagueFilters').style.display = 'none';
-
-  const [pastData, nextData, tableData] = await Promise.all([
-    fetchJSON(`${BASE}/eventspastleague.php?id=${WORLD_CUP_ID}`),
-    fetchJSON(`${BASE}/eventsnextleague.php?id=${WORLD_CUP_ID}`),
-    fetchJSON(`${BASE}/lookuptable.php?l=${WORLD_CUP_ID}&s=${WORLD_CUP_SEASON}`)
-  ]);
-
-  setStatus(false);
-
-  let html = `
-    <div class="wc-banner">
-      <div class="wc-banner-icon">🏆</div>
-      <div>
-        <h2>FIFA World Cup 2026</h2>
-        <p>11 de junio – 19 de julio · 48 selecciones · 16 estadios</p>
-        <div class="wc-host-chips">
-          <span class="wc-chip">🇺🇸 Estados Unidos</span>
-          <span class="wc-chip">🇲🇽 México</span>
-          <span class="wc-chip">🇨🇦 Canadá</span>
-        </div>
+  <!-- NAVBAR -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <div class="nav-logo" onclick="goHome()">SHOCK<span>TV</span></div>
+      <div class="nav-links">
+        <button class="nav-btn active" id="btn-home" onclick="setSection('home')">Inicio</button>
+        <button class="nav-btn" id="btn-movies" onclick="setSection('movies')">Películas</button>
+        <button class="nav-btn" id="btn-tv" onclick="setSection('tv')">Series</button>
+        <button class="nav-btn" id="btn-toprated" onclick="setSection('toprated')">Top Rated</button>
       </div>
-    </div>`;
-
-  const liveOrRecent = (pastData && pastData.events) ? pastData.events.slice(-6).reverse() : [];
-  const upcoming = (nextData && nextData.events) ? nextData.events.slice(0, 8) : [];
-
-  if(upcoming.length){
-    html += `<div class="wc-group-head">⏭ Próximos partidos</div>`;
-    upcoming.forEach(e => { html += matchCardHTML(e); });
-  }
-
-  if(liveOrRecent.length){
-    html += `<div class="wc-group-head">📅 Resultados recientes</div>`;
-    liveOrRecent.forEach(e => { html += matchCardHTML(e); });
-  }
-
-  if(tableData && tableData.table && tableData.table.length){
-    html += `<div class="wc-group-head">📊 Tabla general</div>
-      <table class="standings-table">
-        <thead><tr><th>#</th><th>Selección</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>Pts</th></tr></thead>
-        <tbody>${tableData.table.map(t => `
-          <tr>
-            <td><div class="pos-cell"><span class="pos-num">${t.intRank}</span></div></td>
-            <td><div class="team-cell">${t.strBadge ? `<img src="${t.strBadge}" alt="" onerror="this.style.display='none'">` : ''}<span>${t.strTeam}</span></div></td>
-            <td class="num-cell">${t.intPlayed}</td>
-            <td class="num-cell">${t.intWin}</td>
-            <td class="num-cell">${t.intDraw}</td>
-            <td class="num-cell">${t.intLoss}</td>
-            <td class="pts-cell">${t.intPoints}</td>
-          </tr>`).join('')}</tbody>
-      </table>`;
-  }
-
-  if(!upcoming.length && !liveOrRecent.length && !(tableData && tableData.table && tableData.table.length)){
-    html += `<div class="status-msg show"><p>⚽ Los datos del Mundial 2026 todavía no están completos en la base de datos.<br><br>Probá de nuevo más cerca de la fecha de inicio del torneo.</p></div>`;
-  }
-
-  document.getElementById('content').innerHTML = html;
-}
-
-function matchCardHTML(e){
-  const homeScore = e.intHomeScore !== null && e.intHomeScore !== undefined ? e.intHomeScore : null;
-  const awayScore = e.intAwayScore !== null && e.intAwayScore !== undefined ? e.intAwayScore : null;
-  const hasScore = homeScore !== null && awayScore !== null;
-  const status = e.strStatus || '';
-  const isLive = ['1H','2H','HT','LIVE'].some(s => status.toUpperCase().includes(s));
-  const isFT = status.toUpperCase().includes('FT') || status.toUpperCase().includes('MATCH FINISHED');
-
-  let statusBadge = '';
-  if(isLive) statusBadge = `<span class="match-status status-live">● ${status || 'EN VIVO'}</span>`;
-  else if(isFT || hasScore) statusBadge = `<span class="match-status status-ft">FINALIZADO</span>`;
-  else statusBadge = `<span class="match-status status-ns">PROGRAMADO</span>`;
-
-  const dateStr = e.dateEvent || '';
-  const timeStr = e.strTime ? e.strTime.slice(0,5) : '';
-  const leagueName = e.strLeague || LEAGUE_NAMES[e._league] || '';
-
-  return `
-    <div class="match-card${isLive ? ' is-live' : ''}" data-event-id="${e.idEvent}" data-league-name="${leagueName}" data-home="${(e.strHomeTeam||'').replace(/"/g,'')}" data-away="${(e.strAwayTeam||'').replace(/"/g,'')}" data-home-badge="${e.strHomeTeamBadge||''}" data-away-badge="${e.strAwayTeamBadge||''}" data-score="${hasScore ? homeScore+' - '+awayScore : 'vs'}">
-      <div class="match-top">
-        ${statusBadge}
-        <span class="match-date">${dateStr}${timeStr ? ' · ' + timeStr : ''}</span>
-      </div>
-      <div class="teams-row">
-        <div class="team-col">
-          ${crestImg(e.strHomeTeamBadge, (e.strHomeTeam||'?').slice(0,2).toUpperCase())}
-          <span class="team-name">${e.strHomeTeam || 'Equipo'}</span>
-        </div>
-        <div class="score-col">
-          ${hasScore
-            ? `<div class="score-num">${homeScore} - ${awayScore}</div>`
-            : `<div class="time-text">${timeStr || 'vs'}</div>`}
-        </div>
-        <div class="team-col away">
-          ${crestImg(e.strAwayTeamBadge, (e.strAwayTeam||'?').slice(0,2).toUpperCase())}
-          <span class="team-name">${e.strAwayTeam || 'Equipo'}</span>
-        </div>
-      </div>
-      <div class="click-hint"><i></i>Tocá para ver alineaciones y minuto a minuto</div>
-    </div>`;
-}
-
-function loadCurrentTab(){
-  if(currentTab === 'worldcup') loadWorldCup();
-  else if(currentTab === 'live') loadLive();
-  else if(currentTab === 'today') loadToday();
-  else if(currentTab === 'standings') loadStandings();
-  else if(currentTab === 'community') loadCommunity();
-}
-
-function switchTab(tabName){
-  currentTab = tabName;
-  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
-  document.querySelectorAll('.bn-item').forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
-  document.getElementById('leagueFilters').style.display = (tabName === 'worldcup' || tabName === 'community') ? 'none' : 'flex';
-  loadCurrentTab();
-}
-
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => switchTab(tab.dataset.tab));
-});
-
-document.querySelectorAll('.bn-item').forEach(item => {
-  item.addEventListener('click', () => switchTab(item.dataset.tab));
-});
-
-document.querySelectorAll('.lf').forEach(lf => {
-  lf.addEventListener('click', () => {
-    document.querySelectorAll('.lf').forEach(l => l.classList.remove('active'));
-    lf.classList.add('active');
-    currentLeague = lf.dataset.league;
-    loadCurrentTab();
-  });
-});
-
-document.getElementById('refreshBtn').addEventListener('click', () => {
-  const btn = document.getElementById('refreshBtn');
-  btn.classList.add('spinning');
-  loadCurrentTab();
-  loadGoalTicker();
-  setTimeout(() => btn.classList.remove('spinning'), 800);
-});
-
-// ── MODAL DE DETALLE DE PARTIDO (alineaciones + minuto a minuto) ──
-document.getElementById('content').addEventListener('click', (ev) => {
-  const card = ev.target.closest('.match-card');
-  if(!card) return;
-  openMatchModal(card.dataset);
-});
-
-document.getElementById('modalClose').addEventListener('click', closeModal);
-document.getElementById('modalOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'modalOverlay') closeModal();
-});
-
-function closeModal(){
-  document.getElementById('modalOverlay').classList.remove('open');
-}
-
-let currentModalEventId = null;
-let currentMatchKey = null;
-let currentMatchData = null;
-
-async function openMatchModal(data){
-  currentModalEventId = data.eventId;
-  currentMatchData = data;
-  // Clave única estable del partido (funciona aunque no haya eventId de TheSportsDB)
-  currentMatchKey = `${(data.home||'').replace(/\s+/g,'_')}_vs_${(data.away||'').replace(/\s+/g,'_')}_${data.eventId || 'noid'}`.toLowerCase();
-
-  document.getElementById('modalOverlay').classList.add('open');
-  document.getElementById('modalLeague').textContent = data.leagueName || '';
-  document.getElementById('modalTeams').innerHTML = `
-    <div class="modal-team">${crestImg(data.homeBadge, (data.home||'?').slice(0,2).toUpperCase())}<span class="modal-team-name">${data.home}</span></div>
-    <div class="modal-score">${data.score}</div>
-    <div class="modal-team">${crestImg(data.awayBadge, (data.away||'?').slice(0,2).toUpperCase())}<span class="modal-team-name">${data.away}</span></div>
-  `;
-  document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
-  document.querySelector('.modal-tab[data-mtab="timeline"]').classList.add('active');
-  await loadModalTab('timeline');
-}
-
-document.querySelectorAll('.modal-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    loadModalTab(tab.dataset.mtab);
-  });
-});
-
-async function loadModalTab(tabName){
-  const body = document.getElementById('modalBody');
-  body.innerHTML = `<div style="text-align:center;padding:2rem;"><div class="spinner"></div></div>`;
-
-  if(tabName === 'vote'){ await renderVoteTab(); return; }
-  if(tabName === 'comments'){ await renderCommentsTab(); return; }
-
-  if(!currentModalEventId || currentModalEventId === 'undefined'){
-    body.innerHTML = `<div class="empty-tab-msg">No hay un ID de evento disponible para este partido.</div>`;
-    return;
-  }
-
-  if(tabName === 'timeline'){
-    const data = await fetchJSON(`${BASE}/lookuptimeline.php?id=${currentModalEventId}`);
-    const events = data && data.timeline ? data.timeline : null;
-    if(!events || !events.length){
-      body.innerHTML = `<div class="empty-tab-msg">⏱ Todavía no hay eventos minuto a minuto cargados para este partido.<br><br>Esta información suele aparecer una vez que el partido comienza.</div>`;
-      return;
-    }
-    body.innerHTML = events.map(t => {
-      const type = (t.strTimeline || '').toLowerCase();
-      let icon = '⚪';
-      if(type.includes('goal')) icon = '⚽';
-      else if(type.includes('yellow')) icon = '🟨';
-      else if(type.includes('red')) icon = '🟥';
-      else if(type.includes('sub')) icon = '🔄';
-      return `<div class="timeline-item">
-        <span class="timeline-min">${t.intTime || ''}'</span>
-        <span class="timeline-icon">${icon}</span>
-        <span class="timeline-text"><strong>${t.strPlayer || t.strTimeline || ''}</strong> ${t.strTeam ? '· ' + t.strTeam : ''}</span>
-      </div>`;
-    }).join('');
-  }
-
-  if(tabName === 'lineup'){
-    const data = await fetchJSON(`${BASE}/lookuplineup.php?id=${currentModalEventId}`);
-    const lineup = data && data.lineup ? data.lineup : null;
-    if(!lineup || (!lineup.home_team?.length && !lineup.away_team?.length)){
-      body.innerHTML = `<div class="empty-tab-msg">👕 Las alineaciones todavía no están disponibles.<br><br>Suelen publicarse cerca de la hora del partido.</div>`;
-      return;
-    }
-    const renderPlayer = (p) => {
-      const name = p.strPlayer || p.strSquadPlayer || 'Jugador';
-      const initials = name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
-      const photo = p.strThumb || p.strCutout || '';
-      const photoEl = photo
-        ? `<img class="lineup-photo" src="${photo}" alt="" onerror="this.outerHTML='<div class=&quot;lineup-photo-fallback&quot;>${initials}</div>'">`
-        : `<div class="lineup-photo-fallback">${initials}</div>`;
-      return `
-      <div class="lineup-player">
-        ${photoEl}
-        <div class="lineup-info">
-          <span class="lineup-name">${name}</span>
-          <div class="lineup-meta">
-            ${p.strNumber ? `<span class="lineup-num">#${p.strNumber}</span>` : ''}
-            ${p.strPosition ? `<span class="lineup-pos">${p.strPosition}</span>` : ''}
-          </div>
-        </div>
-      </div>`;
-    };
-    const renderTeam = (players) => (players || []).map(renderPlayer).join('') || '<div class="empty-tab-msg" style="padding:0.5rem 0;">Sin datos</div>';
-
-    body.innerHTML = `
-      <div class="lineup-grid">
-        <div class="lineup-col"><h4>Local</h4>${renderTeam(lineup.home_team)}</div>
-        <div class="lineup-col"><h4>Visitante</h4>${renderTeam(lineup.away_team)}</div>
-      </div>`;
-  }
-}
-
-// ── TICKER DE GOLES RECIENTES (genera enganche) ──
-async function loadGoalTicker(){
-  const inner = document.getElementById('goalTickerInner');
-  try{
-    const data = await fetchJSON(`${BASE}/eventspastleague.php?id=4328`);
-    const events = data && data.events ? data.events.slice(-8).reverse() : [];
-    if(!events.length){ inner.textContent = '⚽ Seguí los resultados en vivo de las mejores ligas del mundo'; return; }
-    const items = events.map(e => {
-      if(e.intHomeScore === null || e.intAwayScore === null) return null;
-      return `<span>⚽ ${e.strHomeTeam} ${e.intHomeScore}-${e.intAwayScore} ${e.strAwayTeam}</span>`;
-    }).filter(Boolean);
-    inner.innerHTML = items.join('') + items.join('');
-  }catch(e){
-    inner.textContent = '⚽ Seguí los resultados en vivo de las mejores ligas del mundo';
-  }
-}
-
-// ── PRESENCIA Y VISITAS REALES (conectado al backend, no simulado) ──
-let hasRegisteredVisit = false;
-
-async function initVisitors(){
-  await sendPresencePing();
-  setInterval(sendPresencePing, 25000);
-}
-
-async function sendPresencePing(){
-  const sessionId = getVoterId();
-  const isNewVisit = !hasRegisteredVisit;
-  const result = await fetchSTV('/api/presence/ping', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sessionId, isNewVisit })
-  });
-  if(result){
-    hasRegisteredVisit = true;
-    document.getElementById('onlineNow').textContent = result.online;
-    document.getElementById('totalVisits').textContent = result.totalVisits.toLocaleString('es-AR');
-  }else{
-    document.getElementById('onlineNow').textContent = '—';
-    document.getElementById('totalVisits').textContent = '—';
-  }
-}
-
-async function updateLiveCount(){
-  try{
-    const ids = Object.keys(LEAGUE_NAMES);
-    let count = 0;
-    for(const lid of ids.slice(0,3)){
-      const data = await fetchJSON(`${BASE}/eventsnextleague.php?id=${lid}`);
-      if(data && data.events){
-        count += data.events.filter(e => {
-          const s = (e.strStatus || '').toUpperCase();
-          return ['1H','2H','HT','LIVE'].some(x => s.includes(x));
-        }).length;
-      }
-    }
-    document.getElementById('liveCount').textContent = count;
-  }catch(e){
-    document.getElementById('liveCount').textContent = '0';
-  }
-}
-
-// ── CUENTA REGRESIVA AL PRÓXIMO PARTIDO DEL MUNDIAL ──
-async function loadWorldCupCountdown(){
-  try{
-    const data = await fetchJSON(`${BASE}/eventsnextleague.php?id=${WORLD_CUP_ID}`);
-    const next = data && data.events && data.events.length ? data.events[0] : null;
-    if(!next || !next.dateEvent){
-      document.getElementById('hypeBanner').style.display = 'none';
-      return;
-    }
-    const target = new Date(next.dateEvent + 'T' + (next.strTime || '00:00:00'));
-    const diff = target - new Date();
-    if(diff <= 0){ document.getElementById('hypeBanner').style.display = 'none'; return; }
-    const days = Math.floor(diff / 86400000);
-    const hours = Math.floor((diff % 86400000) / 3600000);
-    document.getElementById('wcCountdown').textContent = days > 0 ? `${days}d ${hours}h` : `${hours}h`;
-  }catch(e){
-    document.getElementById('hypeBanner').style.display = 'none';
-  }
-}
-
-// ── VOTACIÓN + PREDICCIÓN DE MARCADOR (backend real, compartido) ──
-async function fetchSTV(path, opts){
-  try{
-    const res = await fetch(SHOCKTV_API + path, opts);
-    if(!res.ok) throw new Error('HTTP ' + res.status);
-    return await res.json();
-  }catch(e){
-    console.error('Error backend ShockTV:', e);
-    return null;
-  }
-}
-
-async function renderVoteTab(){
-  const body = document.getElementById('modalBody');
-  const voterId = getVoterId();
-  const myVoteKey = 'shocktv_myvote_' + currentMatchKey;
-  const myPredKey = 'shocktv_mypred_' + currentMatchKey;
-
-  const votes = await fetchSTV(`/api/votes/${encodeURIComponent(currentMatchKey)}`) || { home:0, draw:0, away:0 };
-  const predData = await fetchSTV(`/api/predictions/${encodeURIComponent(currentMatchKey)}`) || { count:0 };
-
-  let myVote = null;
-  try{ myVote = localStorage.getItem(myVoteKey); }catch(e){}
-  let myPred = null;
-  try{ const s = localStorage.getItem(myPredKey); myPred = s ? JSON.parse(s) : null; }catch(e){}
-
-  const total = (votes.home||0) + (votes.draw||0) + (votes.away||0);
-  const pct = (n) => total > 0 ? Math.round((n / total) * 100) : 0;
-  const home = currentMatchData.home, away = currentMatchData.away;
-
-  const voteOptionHTML = (key, label, count, badge) => {
-    const isVoted = myVote === key;
-    const p = pct(count);
-    return `
-      <div class="vote-option${myVote ? ' voted' : ''}" data-vote="${key}" ${myVote ? '' : 'onclick="castVote(\''+key+'\')"'}>
-        ${myVote ? `<div class="vote-fill" style="width:${p}%;"></div>` : ''}
-        <div class="vote-option-row">
-          <span class="vote-option-name">${badge || ''}${label}${isVoted ? ' ✓' : ''}</span>
-          ${myVote ? `<span class="vote-option-pct">${p}%</span>` : ''}
-        </div>
-      </div>`;
-  };
-
-  body.innerHTML = `
-    <div class="vote-section">
-      <div class="vote-title">🗳️ ¿Quién gana?</div>
-      <div class="vote-bars">
-        ${voteOptionHTML('home', home, votes.home||0, crestImg(currentMatchData.homeBadge, home.slice(0,2).toUpperCase()).replace('class="crest"','style="width:18px;height:18px;border-radius:4px;margin-right:6px;"'))}
-        ${voteOptionHTML('draw', 'Empate', votes.draw||0, '🤝 ')}
-        ${voteOptionHTML('away', away, votes.away||0, crestImg(currentMatchData.awayBadge, away.slice(0,2).toUpperCase()).replace('class="crest"','style="width:18px;height:18px;border-radius:4px;margin-right:6px;"'))}
-      </div>
-      ${total > 0 ? `<div class="vote-total">${total} ${total === 1 ? 'voto' : 'votos'} de la comunidad</div>` : `<div class="vote-total">Sé el primero en votar</div>`}
-    </div>
-
-    <div class="vote-section">
-      <div class="vote-title">⚽ Predecí el marcador exacto</div>
-      <div class="predict-box">
-        ${myPred ? `
-          <div class="predict-done">🎯 Predijiste ${myPred.home} - ${myPred.away}</div>
-        ` : `
-          <div class="predict-row">
-            <div class="predict-team">${home}</div>
-            <input type="number" min="0" max="20" class="predict-input" id="predHome" value="0">
-            <span class="predict-sep">-</span>
-            <input type="number" min="0" max="20" class="predict-input" id="predAway" value="0">
-            <div class="predict-team">${away}</div>
-          </div>
-          <button class="predict-btn" onclick="submitPrediction()">Confirmar predicción</button>
-        `}
-        <div class="predict-stats">
-          <div class="predict-stat">
-            <div class="predict-stat-num">${predData.count || 0}</div>
-            <div class="predict-stat-lbl">Predicciones</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-async function castVote(choice){
-  const voterId = getVoterId();
-  const result = await fetchSTV(`/api/votes/${encodeURIComponent(currentMatchKey)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ choice, voterId })
-  });
-  if(!result){ toast('❌ No se pudo registrar el voto. Verificá tu conexión.'); return; }
-  try{ localStorage.setItem('shocktv_myvote_' + currentMatchKey, result.myVote || choice); }catch(e){}
-  toast(result.alreadyVoted ? 'Ya habías votado en este partido' : '✅ ¡Voto registrado!');
-  renderVoteTab();
-}
-
-async function submitPrediction(){
-  const h = parseInt(document.getElementById('predHome').value) || 0;
-  const a = parseInt(document.getElementById('predAway').value) || 0;
-  const voterId = getVoterId();
-  const result = await fetchSTV(`/api/predictions/${encodeURIComponent(currentMatchKey)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ home: h, away: a, voterId })
-  });
-  if(!result){ toast('❌ No se pudo guardar la predicción.'); return; }
-  try{ localStorage.setItem('shocktv_mypred_' + currentMatchKey, JSON.stringify(result.myPrediction || {home:h, away:a})); }catch(e){}
-  toast(result.alreadyPredicted ? 'Ya habías predicho este partido' : '🎯 ¡Predicción guardada!');
-  renderVoteTab();
-}
-
-// ── COMENTARIOS (backend real, compartidos entre todos los visitantes) ──
-function timeAgo(ts){
-  const diff = Date.now() - ts;
-  const min = Math.floor(diff / 60000);
-  if(min < 1) return 'ahora';
-  if(min < 60) return min + 'm';
-  const hrs = Math.floor(min / 60);
-  if(hrs < 24) return hrs + 'h';
-  return Math.floor(hrs / 24) + 'd';
-}
-
-function getSavedName(){
-  try{ return localStorage.getItem('shocktv_username') || ''; }catch(e){ return ''; }
-}
-function saveUsername(name){
-  try{ localStorage.setItem('shocktv_username', name); }catch(e){}
-}
-
-function commentHTML(c, myVoterId, showMatch){
-  const isMine = c.voterId === myVoterId;
-  const repliesHTML = (c.replies||[]).map(r => `
-    <div class="reply-item">
-      <div class="reply-avatar">${(r.name||'?').slice(0,2).toUpperCase()}</div>
-      <div class="reply-body">
-        <span class="comment-author" style="font-size:11px;">${r.name}${r.voterId===myVoterId?'<span style="color:var(--accent2);font-size:9px;"> (vos)</span>':''}<span class="comment-time">${timeAgo(r.ts)}</span></span>
-        <div class="comment-text" style="font-size:11.5px;">${r.text}</div>
-      </div>
-    </div>`).join('');
-
-  return `
-    <div class="comment-item" id="comment-${c.id}">
-      <div class="comment-avatar" style="${isMine?'background:var(--accent2);color:#0B0E14;':''}">${(c.name||'?').slice(0,2).toUpperCase()}</div>
-      <div class="comment-body" style="flex:1;">
-        ${showMatch && c.matchKey ? `<div class="feed-match-tag" onclick="void(0)">⚽ ${c.matchKey.replace(/_vs_/,' vs ').replace(/_/g,' ').split('_')[0]}</div>` : ''}
-        <span class="comment-author">${c.name}${isMine?'<span style="color:var(--accent2);font-size:9px;"> (vos)</span>':''}<span class="comment-time">${timeAgo(c.ts)}</span></span>
-        <div class="comment-text">${c.text}</div>
-        <button class="comment-reply-btn" onclick="toggleReplyForm('${c.id}')">↩ Responder${c.replies&&c.replies.length?` · ${c.replies.length} respuesta${c.replies.length>1?'s':''}`:''}
+      <div class="nav-search">
+        <input type="text" id="search-input" placeholder="Buscar..." autocomplete="off" />
+        <button onclick="doSearch()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         </button>
-        ${repliesHTML ? `<div class="comment-replies">${repliesHTML}</div>` : ''}
-        <div class="reply-form" id="reply-form-${c.id}">
-          <div class="reply-input-row">
-            <input type="text" class="reply-input" id="reply-text-${c.id}" placeholder="Escribí tu respuesta..." maxlength="200">
-            <button class="reply-send" onclick="postReply('${c.id}')">➤</button>
-          </div>
-        </div>
       </div>
-    </div>`;
-}
-
-function toggleReplyForm(commentId){
-  const form = document.getElementById('reply-form-' + commentId);
-  if(!form) return;
-  form.classList.toggle('open');
-  if(form.classList.contains('open')) form.querySelector('input').focus();
-}
-
-async function postReply(commentId){
-  const input = document.getElementById('reply-text-' + commentId);
-  if(!input) return;
-  const text = input.value.trim();
-  const name = getSavedName() || 'Hincha anónimo';
-  if(!text){ toast('⚠️ Escribí algo primero'); return; }
-
-  const result = await fetchSTV(`/api/comments/${encodeURIComponent(currentMatchKey)}/reply/${commentId}`,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ name, text, voterId: getVoterId() })
-  });
-  if(!result){ toast('❌ No se pudo enviar la respuesta.'); return; }
-  toast('💬 Respuesta publicada');
-  renderCommentsTab();
-}
-
-async function renderCommentsTab(){
-  const body = document.getElementById('modalBody');
-  const comments = await fetchSTV(`/api/comments/${encodeURIComponent(currentMatchKey)}`) || [];
-  const savedName = getSavedName();
-  const myVoterId = getVoterId();
-
-  const list = comments.length
-    ? comments.slice().reverse().map(c => commentHTML(c, myVoterId, false)).join('')
-    : `<div class="comment-empty">💬 Sé el primero en comentar este partido</div>`;
-
-  body.innerHTML = `
-    <div class="comment-form">
-      <div class="comment-input-row">
-        <input type="text" class="comment-name-input" id="commentName" placeholder="Tu nombre" maxlength="20" value="${savedName}">
-        <input type="text" class="comment-text-input" id="commentText" placeholder="Escribí un comentario..." maxlength="200">
-        <button class="comment-send-btn" onclick="postComment()">➤</button>
-      </div>
-      <div style="font-size:9.5px;color:var(--muted);">${savedName?`Comentando como <strong style="color:var(--accent2);">${savedName}</strong> · `:''}Los comentarios son públicos</div>
     </div>
-    <div class="comment-list">${list}</div>
-  `;
-  document.getElementById('commentText').addEventListener('keydown',(e)=>{ if(e.key==='Enter') postComment(); });
-}
+  </nav>
 
-async function postComment(){
-  const nameInput = document.getElementById('commentName');
-  const textInput = document.getElementById('commentText');
-  const name = nameInput.value.trim() || 'Hincha anónimo';
-  const text = textInput.value.trim();
-  if(!text){ toast('⚠️ Escribí algo primero'); return; }
-  saveUsername(name);
-  const result = await fetchSTV(`/api/comments/${encodeURIComponent(currentMatchKey)}`,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ name, text, voterId: getVoterId() })
-  });
-  if(!result){ toast('❌ No se pudo publicar. Verificá tu conexión.'); return; }
-  textInput.value = '';
-  toast('💬 Comentario publicado');
-  renderCommentsTab();
-}
+  <!-- HERO -->
+  <section class="hero" id="hero-section">
+    <div class="hero-bg" id="hero-bg"></div>
+    <div class="hero-overlay"></div>
+    <div class="hero-content" id="hero-content">
+      <div class="hero-badge" id="hero-badge">EN TENDENCIA</div>
+      <h1 class="hero-title" id="hero-title">Cargando...</h1>
+      <p class="hero-desc" id="hero-desc"></p>
+      <div class="hero-meta" id="hero-meta"></div>
+      <div class="hero-buttons">
+        <button class="btn-play" id="hero-play-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+          Ver ahora
+        </button>
+        <button class="btn-info" id="hero-info-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Más info
+        </button>
+      </div>
+    </div>
+    <div class="hero-scroll-hint">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+    </div>
+  </section>
 
-// ── PESTAÑA COMUNIDAD — feed real de comentarios recientes ──
-async function loadCommunity(){
-  setStatus(true, 'Cargando comunidad...');
-  document.getElementById('leagueFilters').style.display = 'none';
-  document.getElementById('content').innerHTML = '';
+  <!-- MAIN CONTENT -->
+  <main class="main" id="main-content">
 
-  const myVoterId = getVoterId();
-  const savedName = getSavedName();
-  const feed = await fetchSTV('/api/community/feed') || [];
+    <!-- Search Results -->
+    <section class="content-section hidden" id="search-section">
+      <h2 class="section-title">Resultados de búsqueda</h2>
+      <div class="grid-cards" id="search-results"></div>
+    </section>
 
-  setStatus(false);
-
-  let html = `
-    <div class="community-hdr">
-      <h2>🔥 Comunidad ShockTV</h2>
-      <p>Los últimos comentarios de todos los partidos</p>
-    </div>`;
-
-  if(!feed.length){
-    html += `<div class="feed-empty">
-      <p style="font-size:1.5rem;margin-bottom:8px;">💬</p>
-      <p>Todavía no hay comentarios.</p>
-      <p style="margin-top:6px;font-size:12px;">Entrá a un partido y sé el primero en comentar.</p>
-    </div>`;
-  } else {
-    html += feed.map(c => `
-      <div class="feed-item">
-        <div class="feed-match-tag">⚽ ${decodeURIComponent(c.matchKey||'').replace(/_vs_/,' vs ').replace(/_/g,' ').split('_noid')[0].split('_')[0] || 'Partido'}</div>
-        <div class="comment-item" style="margin-bottom:0;">
-          <div class="comment-avatar" style="${c.voterId===myVoterId?'background:var(--accent2);color:#0B0E14;':''}">${(c.name||'?').slice(0,2).toUpperCase()}</div>
-          <div class="comment-body" style="flex:1;">
-            <span class="comment-author">${c.name}${c.voterId===myVoterId?'<span style="color:var(--accent2);font-size:9px;"> (vos)</span>':''}<span class="comment-time">${timeAgo(c.ts)}</span></span>
-            <div class="comment-text">${c.text}</div>
-            ${(c.replies||[]).length ? `<div style="font-size:10px;color:var(--muted);margin-top:4px;">↩ ${c.replies.length} respuesta${c.replies.length>1?'s':''}</div>` : ''}
-          </div>
+    <!-- Home sections -->
+    <div id="home-sections">
+      <section class="content-section">
+        <h2 class="section-title"><span class="title-accent">🔥</span> Tendencias esta semana</h2>
+        <div class="slider-wrapper">
+          <button class="slider-btn left" onclick="slide('trending-slider', -1)">‹</button>
+          <div class="cards-slider" id="trending-slider"></div>
+          <button class="slider-btn right" onclick="slide('trending-slider', 1)">›</button>
         </div>
-      </div>`).join('');
-  }
+      </section>
 
-  document.getElementById('content').innerHTML = html;
-}
+      <section class="content-section">
+        <h2 class="section-title"><span class="title-accent">🎬</span> Películas populares</h2>
+        <div class="slider-wrapper">
+          <button class="slider-btn left" onclick="slide('movies-slider', -1)">‹</button>
+          <div class="cards-slider" id="movies-slider"></div>
+          <button class="slider-btn right" onclick="slide('movies-slider', 1)">›</button>
+        </div>
+      </section>
 
-loadCurrentTab();
-loadGoalTicker();
-initVisitors();
-updateLiveCount();
-loadWorldCupCountdown();
-setInterval(() => { if(currentTab === 'live' || currentTab === 'worldcup') loadCurrentTab(); }, 60000);
-setInterval(loadGoalTicker, 90000);
-setInterval(updateLiveCount, 60000);
-</script>
+      <section class="content-section">
+        <h2 class="section-title"><span class="title-accent">📺</span> Series populares</h2>
+        <div class="slider-wrapper">
+          <button class="slider-btn left" onclick="slide('tv-slider', -1)">‹</button>
+          <div class="cards-slider" id="tv-slider"></div>
+          <button class="slider-btn right" onclick="slide('tv-slider', 1)">›</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- Movies section -->
+    <div id="movies-section" class="hidden">
+      <h2 class="section-title page-title">Películas</h2>
+      <div class="grid-cards" id="movies-grid"></div>
+    </div>
+
+    <!-- TV section -->
+    <div id="tv-section" class="hidden">
+      <h2 class="section-title page-title">Series</h2>
+      <div class="grid-cards" id="tv-grid"></div>
+    </div>
+
+    <!-- Top Rated section -->
+    <div id="toprated-section" class="hidden">
+      <h2 class="section-title page-title">⭐ Top Rated</h2>
+      <div class="grid-cards" id="toprated-grid"></div>
+    </div>
+
+  </main>
+
+  <!-- MODAL DETAIL -->
+  <div class="modal-overlay hidden" id="modal-overlay" onclick="closeModal(event)">
+    <div class="modal" id="modal">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div class="modal-backdrop" id="modal-backdrop"></div>
+      <div class="modal-body">
+        <div class="modal-poster-wrap">
+          <img class="modal-poster" id="modal-poster" src="" alt="" />
+        </div>
+        <div class="modal-info">
+          <div class="modal-badges" id="modal-badges"></div>
+          <h2 class="modal-title" id="modal-title"></h2>
+          <div class="modal-meta" id="modal-meta"></div>
+          <p class="modal-overview" id="modal-overview"></p>
+          <div class="modal-cast" id="modal-cast"></div>
+          <div class="modal-trailer" id="modal-trailer"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading-overlay hidden" id="loading-overlay">
+    <div class="loader">
+      <div class="loader-logo">SHOCK<span>TV</span></div>
+      <div class="loader-bar"><div class="loader-fill"></div></div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <p>© 2025 ShockTV — Datos provistos por <a href="https://www.themoviedb.org" target="_blank">TMDB</a></p>
+  </footer>
+
+  <script src="app.js"></script>
 </body>
 </html>
