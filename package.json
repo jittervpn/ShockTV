@@ -1,11 +1,9 @@
 {
   "name": "shocktv",
-  "version": "1.0.0",
-  "description": "ShockTV - Plataforma de películas y series",
+  "version": "1.0.1",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
