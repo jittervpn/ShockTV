@@ -1,130 +1,141 @@
 const express = require('express');
-const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
+const https = require('https');
 const path = require('path');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const TMDB_TOKEN = process.env.TMDB_TOKEN;
-const BASE_URL = 'https://api.themoviedb.org/3';
+const BASE_URL = 'api.themoviedb.org';
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const tmdbHeaders = {
-  accept: 'application/json',
-  Authorization: `Bearer ${TMDB_TOKEN}`
-};
+// Helper: HTTPS request to TMDB
+function tmdbGet(urlPath) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: BASE_URL,
+      path: urlPath,
+      method: 'GET',
+      headers: {
+        'accept': 'application/json',
+        'Authorization': `Bearer ${TMDB_TOKEN}`
+      }
+    };
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { reject(new Error('JSON parse error')); }
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
 
-// Trending movies & series
+// Trending
 app.get('/api/trending', async (req, res) => {
   try {
     const [movies, tv] = await Promise.all([
-      fetch(`${BASE_URL}/trending/movie/week?language=es-ES`, { headers: tmdbHeaders }),
-      fetch(`${BASE_URL}/trending/tv/week?language=es-ES`, { headers: tmdbHeaders })
+      tmdbGet('/3/trending/movie/week?language=es-ES'),
+      tmdbGet('/3/trending/tv/week?language=es-ES')
     ]);
-    const moviesData = await movies.json();
-    const tvData = await tv.json();
-    res.json({ movies: moviesData.results, tv: tvData.results });
+    res.json({ movies: movies.results || [], tv: tv.results || [] });
   } catch (e) {
-    res.status(500).json({ error: 'Error fetching trending' });
+    console.error('trending error:', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
 // Popular movies
 app.get('/api/movies/popular', async (req, res) => {
   try {
-    const r = await fetch(`${BASE_URL}/movie/popular?language=es-ES&page=1`, { headers: tmdbHeaders });
-    const data = await r.json();
-    res.json(data.results);
+    const data = await tmdbGet('/3/movie/popular?language=es-ES&page=1');
+    res.json(data.results || []);
   } catch (e) {
-    res.status(500).json({ error: 'Error fetching movies' });
+    console.error('movies error:', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
 // Popular TV
 app.get('/api/tv/popular', async (req, res) => {
   try {
-    const r = await fetch(`${BASE_URL}/tv/popular?language=es-ES&page=1`, { headers: tmdbHeaders });
-    const data = await r.json();
-    res.json(data.results);
+    const data = await tmdbGet('/3/tv/popular?language=es-ES&page=1');
+    res.json(data.results || []);
   } catch (e) {
-    res.status(500).json({ error: 'Error fetching TV shows' });
+    console.error('tv error:', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
 // Search
 app.get('/api/search', async (req, res) => {
-  const { q } = req.query;
+  const q = req.query.q;
   if (!q) return res.json([]);
   try {
-    const r = await fetch(`${BASE_URL}/search/multi?query=${encodeURIComponent(q)}&language=es-ES`, { headers: tmdbHeaders });
-    const data = await r.json();
-    res.json(data.results.filter(item => item.media_type !== 'person'));
+    const data = await tmdbGet(`/3/search/multi?query=${encodeURIComponent(q)}&language=es-ES`);
+    const results = (data.results || []).filter(i => i.media_type !== 'person');
+    res.json(results);
   } catch (e) {
-    res.status(500).json({ error: 'Error searching' });
+    console.error('search error:', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
-// Detail (movie or tv)
+// Detail
 app.get('/api/detail/:type/:id', async (req, res) => {
   const { type, id } = req.params;
   try {
     const [detail, credits, videos] = await Promise.all([
-      fetch(`${BASE_URL}/${type}/${id}?language=es-ES`, { headers: tmdbHeaders }),
-      fetch(`${BASE_URL}/${type}/${id}/credits?language=es-ES`, { headers: tmdbHeaders }),
-      fetch(`${BASE_URL}/${type}/${id}/videos?language=es-ES`, { headers: tmdbHeaders })
+      tmdbGet(`/3/${type}/${id}?language=es-ES`),
+      tmdbGet(`/3/${type}/${id}/credits?language=es-ES`),
+      tmdbGet(`/3/${type}/${id}/videos?language=es-ES`)
     ]);
-    const detailData = await detail.json();
-    const creditsData = await credits.json();
-    const videosData = await videos.json();
-    res.json({ ...detailData, credits: creditsData, videos: videosData.results });
+    res.json({ ...detail, credits, videos: videos.results || [] });
   } catch (e) {
-    res.status(500).json({ error: 'Error fetching detail' });
+    console.error('detail error:', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
-// Top rated movies
+// Top rated
 app.get('/api/movies/toprated', async (req, res) => {
   try {
-    const r = await fetch(`${BASE_URL}/movie/top_rated?language=es-ES&page=1`, { headers: tmdbHeaders });
-    const data = await r.json();
-    res.json(data.results);
+    const data = await tmdbGet('/3/movie/top_rated?language=es-ES&page=1');
+    res.json(data.results || []);
   } catch (e) {
-    res.status(500).json({ error: 'Error fetching top rated' });
+    console.error('toprated error:', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
-// Genres
-app.get('/api/genres/:type', async (req, res) => {
-  const { type } = req.params;
-  try {
-    const r = await fetch(`${BASE_URL}/genre/${type}/list?language=es-ES`, { headers: tmdbHeaders });
-    const data = await r.json();
-    res.json(data.genres);
-  } catch (e) {
-    res.status(500).json({ error: 'Error fetching genres' });
-  }
-});
-
-// Discover by genre
+// Discover
 app.get('/api/discover/:type', async (req, res) => {
   const { type } = req.params;
-  const { genre } = req.query;
+  const genre = req.query.genre || '';
   try {
-    const r = await fetch(`${BASE_URL}/discover/${type}?language=es-ES&with_genres=${genre}&sort_by=popularity.desc`, { headers: tmdbHeaders });
-    const data = await r.json();
-    res.json(data.results);
+    const data = await tmdbGet(`/3/discover/${type}?language=es-ES&with_genres=${genre}&sort_by=popularity.desc`);
+    res.json(data.results || []);
   } catch (e) {
-    res.status(500).json({ error: 'Error discovering' });
+    res.status(500).json({ error: e.message });
   }
 });
 
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', token: TMDB_TOKEN ? 'set' : 'MISSING' });
+});
+
+// SPA fallback
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => {
   console.log(`ShockTV running on port ${PORT}`);
+  console.log(`TMDB_TOKEN: ${TMDB_TOKEN ? 'OK ✓' : '❌ MISSING'}`);
 });
