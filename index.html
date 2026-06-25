@@ -5,13 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ShockTV</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
-  <!-- NAVBAR -->
   <nav class="navbar" id="navbar">
     <div class="nav-inner">
       <div class="nav-logo" onclick="goHome()">SHOCK<span>TV</span></div>
@@ -30,12 +27,11 @@
     </div>
   </nav>
 
-  <!-- HERO -->
   <section class="hero" id="hero-section">
     <div class="hero-bg" id="hero-bg"></div>
     <div class="hero-overlay"></div>
     <div class="hero-content" id="hero-content">
-      <div class="hero-badge" id="hero-badge">EN TENDENCIA</div>
+      <div class="hero-badge">EN TENDENCIA</div>
       <h1 class="hero-title" id="hero-title">Cargando...</h1>
       <p class="hero-desc" id="hero-desc"></p>
       <div class="hero-meta" id="hero-meta"></div>
@@ -55,66 +51,53 @@
     </div>
   </section>
 
-  <!-- MAIN CONTENT -->
   <main class="main" id="main-content">
-
-    <!-- Search Results -->
     <section class="content-section hidden" id="search-section">
       <h2 class="section-title">Resultados de búsqueda</h2>
       <div class="grid-cards" id="search-results"></div>
     </section>
 
-    <!-- Home sections -->
     <div id="home-sections">
       <section class="content-section">
         <h2 class="section-title"><span class="title-accent">🔥</span> Tendencias esta semana</h2>
         <div class="slider-wrapper">
-          <button class="slider-btn left" onclick="slide('trending-slider', -1)">‹</button>
+          <button class="slider-btn left" onclick="slide('trending-slider',-1)">‹</button>
           <div class="cards-slider" id="trending-slider"></div>
-          <button class="slider-btn right" onclick="slide('trending-slider', 1)">›</button>
+          <button class="slider-btn right" onclick="slide('trending-slider',1)">›</button>
         </div>
       </section>
-
       <section class="content-section">
         <h2 class="section-title"><span class="title-accent">🎬</span> Películas populares</h2>
         <div class="slider-wrapper">
-          <button class="slider-btn left" onclick="slide('movies-slider', -1)">‹</button>
+          <button class="slider-btn left" onclick="slide('movies-slider',-1)">‹</button>
           <div class="cards-slider" id="movies-slider"></div>
-          <button class="slider-btn right" onclick="slide('movies-slider', 1)">›</button>
+          <button class="slider-btn right" onclick="slide('movies-slider',1)">›</button>
         </div>
       </section>
-
       <section class="content-section">
         <h2 class="section-title"><span class="title-accent">📺</span> Series populares</h2>
         <div class="slider-wrapper">
-          <button class="slider-btn left" onclick="slide('tv-slider', -1)">‹</button>
+          <button class="slider-btn left" onclick="slide('tv-slider',-1)">‹</button>
           <div class="cards-slider" id="tv-slider"></div>
-          <button class="slider-btn right" onclick="slide('tv-slider', 1)">›</button>
+          <button class="slider-btn right" onclick="slide('tv-slider',1)">›</button>
         </div>
       </section>
     </div>
 
-    <!-- Movies section -->
     <div id="movies-section" class="hidden">
-      <h2 class="section-title page-title">Películas</h2>
+      <h2 class="section-title page-title">🎬 Películas</h2>
       <div class="grid-cards" id="movies-grid"></div>
     </div>
-
-    <!-- TV section -->
     <div id="tv-section" class="hidden">
-      <h2 class="section-title page-title">Series</h2>
+      <h2 class="section-title page-title">📺 Series</h2>
       <div class="grid-cards" id="tv-grid"></div>
     </div>
-
-    <!-- Top Rated section -->
     <div id="toprated-section" class="hidden">
       <h2 class="section-title page-title">⭐ Top Rated</h2>
       <div class="grid-cards" id="toprated-grid"></div>
     </div>
-
   </main>
 
-  <!-- MODAL DETAIL -->
   <div class="modal-overlay hidden" id="modal-overlay" onclick="closeModal(event)">
     <div class="modal" id="modal">
       <button class="modal-close" onclick="closeModal()">✕</button>
@@ -135,7 +118,6 @@
     </div>
   </div>
 
-  <!-- LOADING -->
   <div class="loading-overlay hidden" id="loading-overlay">
     <div class="loader">
       <div class="loader-logo">SHOCK<span>TV</span></div>
@@ -144,9 +126,10 @@
   </div>
 
   <footer class="footer">
-    <p>© 2025 ShockTV — Datos provistos por <a href="https://www.themoviedb.org" target="_blank">TMDB</a></p>
+    <p>© 2025 ShockTV — Datos por <a href="https://www.themoviedb.org" target="_blank">TMDB</a></p>
   </footer>
 
+  <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
