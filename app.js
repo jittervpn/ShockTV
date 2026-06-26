@@ -63,8 +63,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function loadToken() {
-  try { const r=await fetch('/api/token'); if(r.ok){const d=await r.json(); if(d.token){TOKEN=d.token;return;}} } catch(e){}
-  if (window.TMDB_TOKEN) { TOKEN=window.TMDB_TOKEN; }
+  // 1) Inyectado por el servidor directo en el HTML (Railway)
+  if (window.__TMDB_TOKEN__ && window.__TMDB_TOKEN__.length > 10) {
+    TOKEN = window.__TMDB_TOKEN__; return;
+  }
+  // 2) Endpoint /api/token
+  try {
+    const r = await fetch('/api/token');
+    if (r.ok) { const d = await r.json(); if (d.token) { TOKEN = d.token; return; } }
+  } catch(e) {}
+  // 3) config.js local (GitHub Pages / dev)
+  if (window.TMDB_TOKEN) { TOKEN = window.TMDB_TOKEN; }
 }
 
 function setupNavScroll() {
