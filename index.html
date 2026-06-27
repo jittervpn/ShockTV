@@ -2,7 +2,10 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="theme-color" content="#09090f"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <title>ShockTV</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,7 +14,7 @@
 </head>
 <body>
 
-<!-- SIDEBAR -->
+<!-- ══ SIDEBAR ══ -->
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-header">
@@ -21,28 +24,13 @@
   <nav class="sidebar-nav">
 
     <div class="sb-label">EXPLORAR</div>
-    <button class="sb-item" data-section="home" onclick="goHome()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-      Inicio
-    </button>
-    <button class="sb-item" data-section="movies" onclick="setSection('movies')">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
-      Películas
-    </button>
-    <button class="sb-item" data-section="tv" onclick="setSection('tv')">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>
-      Series
-    </button>
-    <button class="sb-item" data-section="anime" onclick="setSection('anime')">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-      Anime
-    </button>
-    <button class="sb-item" data-section="toprated" onclick="setSection('toprated')">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-      Top Rated
-    </button>
+    <button class="sb-item" id="sb-home"     onclick="goHome()">🏠 Inicio</button>
+    <button class="sb-item" id="sb-movies"   onclick="setSection('movies')">🎬 Películas</button>
+    <button class="sb-item" id="sb-tv"       onclick="setSection('tv')">📺 Series</button>
+    <button class="sb-item" id="sb-anime"    onclick="setSection('anime')">⛩️ Anime</button>
+    <button class="sb-item" id="sb-toprated" onclick="setSection('toprated')">⭐ Top Rated</button>
 
-    <div class="sb-label">PELÍCULAS POR GÉNERO</div>
+    <div class="sb-label">PELÍCULAS — GÉNERO</div>
     <button class="sb-item" onclick="setGenre('movie',28,'🥊 Acción')">🥊 Acción</button>
     <button class="sb-item" onclick="setGenre('movie',35,'😂 Comedia')">😂 Comedia</button>
     <button class="sb-item" onclick="setGenre('movie',27,'👻 Terror')">👻 Terror</button>
@@ -55,53 +43,63 @@
     <button class="sb-item" onclick="setGenre('movie',14,'🧙 Fantasía')">🧙 Fantasía</button>
     <button class="sb-item" onclick="setGenre('movie',36,'📜 Historia')">📜 Historia</button>
     <button class="sb-item" onclick="setGenre('movie',10752,'⚔️ Bélica')">⚔️ Bélica</button>
+    <button class="sb-item" onclick="setGenre('movie',99,'🎥 Documental')">🎥 Documental</button>
 
-    <div class="sb-label">SERIES POR GÉNERO</div>
+    <div class="sb-label">SERIES — GÉNERO</div>
     <button class="sb-item" onclick="setGenre('tv',10765,'🧙 Sci-Fi & Fantasy')">🧙 Sci-Fi & Fantasy</button>
     <button class="sb-item" onclick="setGenre('tv',18,'🎭 Drama')">🎭 Drama</button>
     <button class="sb-item" onclick="setGenre('tv',35,'😂 Comedia')">😂 Comedia</button>
     <button class="sb-item" onclick="setGenre('tv',80,'🕵️ Crimen')">🕵️ Crimen</button>
-    <button class="sb-item" onclick="setGenre('tv',10759,'⚔️ Acción')">⚔️ Acción</button>
+    <button class="sb-item" onclick="setGenre('tv',10759,'⚔️ Acción y Aventura')">⚔️ Acción</button>
     <button class="sb-item" onclick="setGenre('tv',9648,'🔍 Misterio')">🔍 Misterio</button>
     <button class="sb-item" onclick="setGenre('tv',10762,'👶 Familiar')">👶 Familiar</button>
-    <button class="sb-item" onclick="setGenre('tv',10763,'📰 Noticias')">📰 Noticias</button>
+    <button class="sb-item" onclick="setGenre('tv',10768,'⚔️ War & Politics')">🏛️ War & Politics</button>
 
-    <div class="sb-label">ANIME POR GÉNERO</div>
-    <button class="sb-item" onclick="setAnimeGenre(28,'🥊 Anime Acción')">🥊 Acción</button>
-    <button class="sb-item" onclick="setAnimeGenre(12,'🗺️ Anime Aventura')">🗺️ Aventura</button>
-    <button class="sb-item" onclick="setAnimeGenre(14,'🧙 Anime Fantasía')">🧙 Fantasía</button>
-    <button class="sb-item" onclick="setAnimeGenre(878,'🤖 Anime Sci-Fi')">🤖 Sci-Fi</button>
-    <button class="sb-item" onclick="setAnimeGenre(10765,'⚡ Anime Sobrenatural')">⚡ Sobrenatural</button>
-    <button class="sb-item" onclick="setAnimeGenre(35,'😂 Anime Comedia')">😂 Comedia</button>
-    <button class="sb-item" onclick="setAnimeGenre(10749,'❤️ Anime Romance')">❤️ Romance</button>
+    <div class="sb-label">ANIME — GÉNERO</div>
+    <button class="sb-item" onclick="setAnimeGenre(28,'🥊 Anime · Acción')">🥊 Acción</button>
+    <button class="sb-item" onclick="setAnimeGenre(12,'🗺️ Anime · Aventura')">🗺️ Aventura</button>
+    <button class="sb-item" onclick="setAnimeGenre(14,'🧙 Anime · Fantasía')">🧙 Fantasía</button>
+    <button class="sb-item" onclick="setAnimeGenre(878,'🤖 Anime · Sci-Fi')">🤖 Sci-Fi</button>
+    <button class="sb-item" onclick="setAnimeGenre(35,'😂 Anime · Comedia')">😂 Comedia</button>
+    <button class="sb-item" onclick="setAnimeGenre(10749,'❤️ Anime · Romance')">❤️ Romance</button>
+    <button class="sb-item" onclick="setAnimeGenre(27,'👻 Anime · Terror')">👻 Terror</button>
+    <button class="sb-item" onclick="setAnimeGenre(18,'🎭 Anime · Drama')">🎭 Drama</button>
+    <button class="sb-item" onclick="setAnimeGenre(9648,'🔍 Anime · Misterio')">🔍 Misterio</button>
 
   </nav>
 </aside>
 
-<!-- NAVBAR -->
+<!-- ══ NAVBAR ══ -->
 <nav class="navbar" id="navbar">
   <div class="nav-inner">
-    <button class="hamburger" onclick="openSidebar()">
+    <button class="hamburger" onclick="openSidebar()" aria-label="Menú">
       <span></span><span></span><span></span>
     </button>
     <div class="nav-logo" onclick="goHome()">SHOCK<span>TV</span></div>
     <div class="nav-links">
-      <button class="nav-btn active" id="nb-home" onclick="goHome()">Inicio</button>
-      <button class="nav-btn" id="nb-movies" onclick="setSection('movies')">Películas</button>
-      <button class="nav-btn" id="nb-tv" onclick="setSection('tv')">Series</button>
-      <button class="nav-btn" id="nb-anime" onclick="setSection('anime')">⛩️ Anime</button>
-      <button class="nav-btn" id="nb-toprated" onclick="setSection('toprated')">Top ⭐</button>
+      <button class="nav-btn active" id="nb-home"     onclick="goHome()">Inicio</button>
+      <button class="nav-btn"        id="nb-movies"   onclick="setSection('movies')">Películas</button>
+      <button class="nav-btn"        id="nb-tv"       onclick="setSection('tv')">Series</button>
+      <button class="nav-btn"        id="nb-anime"    onclick="setSection('anime')">⛩️ Anime</button>
+      <button class="nav-btn"        id="nb-toprated" onclick="setSection('toprated')">Top ⭐</button>
     </div>
-    <div class="nav-search">
-      <input type="text" id="search-input" placeholder="Buscar..." autocomplete="off"/>
-      <button onclick="doSearch()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      </button>
+    <div class="nav-right">
+      <!-- Network indicator -->
+      <div class="net-bar" id="net-bar" title="Estado de red">
+        <span class="net-dot" id="net-dot"></span>
+        <span class="net-txt" id="net-txt">Detectando...</span>
+      </div>
+      <div class="nav-search">
+        <input type="text" id="search-input" placeholder="Buscar..." autocomplete="off"/>
+        <button onclick="doSearch()" aria-label="Buscar">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </button>
+      </div>
     </div>
   </div>
 </nav>
 
-<!-- HERO -->
+<!-- ══ HERO ══ -->
 <section class="hero" id="hero-section">
   <div class="hero-bg" id="hero-bg"></div>
   <div class="hero-overlay"></div>
@@ -112,11 +110,11 @@
     <div class="hero-meta" id="hero-meta"></div>
     <div class="hero-buttons">
       <button class="btn-play" id="hero-play-btn">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
         Ver ahora
       </button>
       <button class="btn-info" id="hero-info-btn">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         Más info
       </button>
     </div>
@@ -126,27 +124,24 @@
   </div>
 </section>
 
-<!-- MAIN -->
+<!-- ══ MAIN ══ -->
 <main class="main" id="main-content">
 
-  <!-- Búsqueda -->
   <div id="search-section" class="hidden">
     <h2 class="section-title page-title" id="search-title">Resultados</h2>
     <div class="grid-cards" id="search-results"></div>
   </div>
 
-  <!-- Género -->
   <div id="genre-section" class="hidden">
     <h2 class="section-title page-title" id="genre-title">Género</h2>
     <div class="grid-cards" id="genre-grid"></div>
   </div>
 
-  <!-- Home -->
   <div id="home-sections">
     <section class="content-section">
       <h2 class="section-title">🔥 Tendencias</h2>
       <div class="slider-wrapper">
-        <button class="slider-btn left" onclick="slide('s-trending',-1)">‹</button>
+        <button class="slider-btn left"  onclick="slide('s-trending',-1)">‹</button>
         <div class="cards-slider" id="s-trending"></div>
         <button class="slider-btn right" onclick="slide('s-trending',1)">›</button>
       </div>
@@ -154,7 +149,7 @@
     <section class="content-section">
       <h2 class="section-title">🎬 Películas populares</h2>
       <div class="slider-wrapper">
-        <button class="slider-btn left" onclick="slide('s-movies',-1)">‹</button>
+        <button class="slider-btn left"  onclick="slide('s-movies',-1)">‹</button>
         <div class="cards-slider" id="s-movies"></div>
         <button class="slider-btn right" onclick="slide('s-movies',1)">›</button>
       </div>
@@ -162,7 +157,7 @@
     <section class="content-section">
       <h2 class="section-title">📺 Series populares</h2>
       <div class="slider-wrapper">
-        <button class="slider-btn left" onclick="slide('s-tv',-1)">‹</button>
+        <button class="slider-btn left"  onclick="slide('s-tv',-1)">‹</button>
         <div class="cards-slider" id="s-tv"></div>
         <button class="slider-btn right" onclick="slide('s-tv',1)">›</button>
       </div>
@@ -170,73 +165,74 @@
     <section class="content-section">
       <h2 class="section-title">⛩️ Anime popular</h2>
       <div class="slider-wrapper">
-        <button class="slider-btn left" onclick="slide('s-anime',-1)">‹</button>
+        <button class="slider-btn left"  onclick="slide('s-anime',-1)">‹</button>
         <div class="cards-slider" id="s-anime"></div>
         <button class="slider-btn right" onclick="slide('s-anime',1)">›</button>
       </div>
     </section>
   </div>
 
-  <!-- Páginas -->
-  <div id="movies-section" class="hidden">
-    <h2 class="section-title page-title">🎬 Películas</h2>
-    <div class="grid-cards" id="movies-grid"></div>
-  </div>
-  <div id="tv-section" class="hidden">
-    <h2 class="section-title page-title">📺 Series</h2>
-    <div class="grid-cards" id="tv-grid"></div>
-  </div>
-  <div id="anime-section" class="hidden">
-    <h2 class="section-title page-title">⛩️ Anime</h2>
-    <div class="grid-cards" id="anime-grid"></div>
-  </div>
-  <div id="toprated-section" class="hidden">
-    <h2 class="section-title page-title">⭐ Top Rated</h2>
-    <div class="grid-cards" id="toprated-grid"></div>
-  </div>
+  <div id="movies-section"   class="hidden"><h2 class="section-title page-title">🎬 Películas</h2><div class="grid-cards" id="movies-grid"></div></div>
+  <div id="tv-section"       class="hidden"><h2 class="section-title page-title">📺 Series</h2><div class="grid-cards" id="tv-grid"></div></div>
+  <div id="anime-section"    class="hidden"><h2 class="section-title page-title">⛩️ Anime</h2><div class="grid-cards" id="anime-grid"></div></div>
+  <div id="toprated-section" class="hidden"><h2 class="section-title page-title">⭐ Top Rated</h2><div class="grid-cards" id="toprated-grid"></div></div>
 
 </main>
 
-<!-- ===== PLAYER MODAL ===== -->
+<!-- ══ PLAYER ══ -->
 <div class="player-overlay hidden" id="player-overlay">
   <div class="player-box">
+
+    <!-- Top bar -->
     <div class="player-topbar">
-      <div class="player-info">
-        <span class="player-title-text" id="player-title">Reproduciendo...</span>
-        <span class="player-ep-info" id="player-ep-info"></span>
+      <div class="player-left">
+        <button class="player-back" onclick="closePlayer()" title="Cerrar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div>
+          <div class="player-title-txt" id="player-title">Reproduciendo...</div>
+          <div class="player-ep-info"   id="player-ep-info"></div>
+        </div>
       </div>
       <button class="player-close-btn" onclick="closePlayer()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
 
-    <!-- TV: season/episode selectors -->
+    <!-- TV: temporada / episodio -->
     <div class="player-tv-controls hidden" id="player-tv-controls">
-      <div class="tv-selectors">
-        <div class="tv-select-group">
+      <div class="tv-row">
+        <div class="tv-grp">
           <label>Temporada</label>
-          <select id="season-select" onchange="onSeasonChange()"></select>
+          <select id="season-select"  onchange="onSeasonChange()"></select>
         </div>
-        <div class="tv-select-group">
+        <div class="tv-grp">
           <label>Episodio</label>
           <select id="episode-select" onchange="onEpisodeChange()"></select>
         </div>
       </div>
     </div>
 
+    <!-- Frame -->
     <div class="player-frame-wrap">
-      <iframe id="player-frame" allowfullscreen allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation allow-pointer-lock"></iframe>
+      <iframe id="player-frame"
+        allowfullscreen
+        allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation allow-pointer-lock">
+      </iframe>
     </div>
 
-    <div class="player-sources-bar">
-      <span class="sources-label">Fuente:</span>
-      <div class="source-btns" id="source-btns"></div>
+    <!-- Anime lang bar -->
+    <div class="player-lang-bar hidden" id="player-lang-bar">
+      <span class="lang-label">Idioma:</span>
+      <button class="lang-btn active" id="btn-sub" onclick="setLang('sub')">SUB</button>
+      <button class="lang-btn"        id="btn-dub" onclick="setLang('dub')">DUB</button>
     </div>
+
   </div>
 </div>
 
-<!-- ===== DETAIL MODAL ===== -->
+<!-- ══ DETAIL MODAL ══ -->
 <div class="modal-overlay hidden" id="modal-overlay" onclick="closeModal(event)">
   <div class="modal" id="modal">
     <button class="modal-close" onclick="closeModal()">✕</button>
@@ -246,18 +242,18 @@
         <img class="modal-poster" id="modal-poster" src="" alt=""/>
       </div>
       <div class="modal-info">
-        <div class="modal-badges" id="modal-badges"></div>
-        <h2 class="modal-title" id="modal-title"></h2>
-        <div class="modal-meta" id="modal-meta"></div>
-        <p class="modal-overview" id="modal-overview"></p>
+        <div class="modal-badges"   id="modal-badges"></div>
+        <h2 class="modal-title"     id="modal-title"></h2>
+        <div class="modal-meta"     id="modal-meta"></div>
+        <p class="modal-overview"   id="modal-overview"></p>
         <div class="modal-watch-btn" id="modal-watch-btn"></div>
-        <div class="modal-cast" id="modal-cast"></div>
+        <div class="modal-cast"     id="modal-cast"></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- LOADING -->
+<!-- ══ LOADING ══ -->
 <div class="loading-overlay hidden" id="loading-overlay">
   <div class="loader">
     <div class="loader-logo">SHOCK<span>TV</span></div>
@@ -266,7 +262,7 @@
 </div>
 
 <footer class="footer">
-  <p>© 2025 ShockTV · Datos: <a href="https://themoviedb.org" target="_blank">TMDB</a> · Streaming: Unlimplay & fuentes externas</p>
+  <p>© 2025 ShockTV · Datos: <a href="https://themoviedb.org" target="_blank">TMDB</a> · Streaming: Unlimplay &amp; MegaPlay</p>
 </footer>
 
 <script src="config.js"></script>
