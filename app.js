@@ -1,41 +1,56 @@
-// ════════════════════════════════════════════════
+// ═══════════════════════════════════════════
 //  ShockTV — app.js
-// ════════════════════════════════════════════════
+// ═══════════════════════════════════════════
 const IMG_W500 = 'https://image.tmdb.org/t/p/w500';
 const IMG_W780 = 'https://image.tmdb.org/t/p/w780';
 const IMG_ORI  = 'https://image.tmdb.org/t/p/original';
 const TMDB_URL = 'https://api.themoviedb.org/3';
-const ANIFY    = 'https://api.anify.tv';
+const JIKAN    = 'https://api.jikan.moe/v4';
 const ANIME_KW = 210024;
 
-// ── Streaming sources ──
-const SRC_MOVIE = id      => `https://unlimplay.com/play/embed/movie/${id}`;
-const SRC_TV    = (id,s,e)=> `https://unlimplay.com/play/embed/tv/${id}/${s}/${e}`;
-const SRC_ANIME = (id,ep,lang='sub') => `https://megaplay.buzz/stream/ani/${id}/${ep}/${lang}`;
+// ── Fuentes de streaming ──
+// Películas / Series: Unlimplay
+const SRC_MOVIE = id       => `https://unlimplay.com/play/embed/movie/${id}`;
+const SRC_TV    = (id,s,e) => `https://unlimplay.com/play/embed/tv/${id}/${s}/${e}`;
+
+// Anime por MAL ID:
+// 1. MegaPlay (sub/dub inglés)
+// 2. LATanime  (audio latino/castellano) — via embed de su propia página
+const SRC_ANIME_MEGA  = (malId,ep,lang='sub') => `https://megaplay.buzz/stream/mal/${malId}/${ep}/${lang}`;
+const SRC_ANIME_LAT   = (slug,ep)             => `https://latanime.org/embed/${slug}/${ep}`;
+// Fallback genérico por MAL ID en 2embed
+const SRC_ANIME_EMBED = (malId,ep)            => `https://www.2embed.stream/embed/anilist/${malId}/${ep}`;
 
 // ── State ──
 let TOKEN = '';
 let heroItems=[], heroIdx=0, heroTimer=null;
-let pl = { type:'', tmdbId:0, s:1, ep:1, seasons:[], title:'', isAnime:false, aniId:null, lang:'sub' };
-let favs = {}; // { "movie-123": {id,type,title,poster,rating}, ... }
+let pl = { type:'', tmdbId:0, malId:null, latSlug:null, s:1, ep:1, seasons:[], title:'', isAnime:false, lang:'sub', srcMode:'mega' };
+let favs = {};
 
 // ── Utils ──
 const $ = id => document.getElementById(id);
 const show = id => $(id)?.classList.remove('hidden');
 const hide = id => $(id)?.classList.add('hidden');
 const esc  = s  => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 function tmdbH(){ return { accept:'application/json', Authorization:'Bearer '+TOKEN }; }
+
 async function tmdb(path){
   const r = await fetch(TMDB_URL+path, { headers:tmdbH() });
   const d = await r.json();
   if(!r.ok || d.success===false) throw new Error(d.status_message||'TMDB error');
   return d;
 }
-async function anify(path){
-  const r = await fetch(ANIFY+path, { headers:{ accept:'application/json' } });
-  if(!r.ok) throw new Error('Anify error '+r.status);
-  return r.json();
+
+// Jikan con retry automático si hay rate limit (429)
+async function jikan(path, attempt=0){
+  try {
+    const r = await fetch(JIKAN+path, { headers:{ accept:'application/json' } });
+    if(r.status===429 && attempt<2){ await sleep(1200); return jikan(path, attempt+1); }
+    if(!r.ok) throw new Error('Jikan '+r.status);
+    return r.json();
+  } catch(e) { throw e; }
 }
 
 // ── Toast ──
@@ -47,7 +62,9 @@ function toast(msg, dur=2800){
   toastTimer=setTimeout(()=>hide('toast'), dur);
 }
 
-// ════ INIT ════
+// ══════════════════════════════════
+//  INIT
+// ══════════════════════════════════
 document.addEventListener('DOMContentLoaded', async()=>{
   show('loader-ov');
   window.addEventListener('scroll', ()=> $('navbar').classList.toggle('scrolled', window.scrollY>60));
@@ -58,7 +75,7 @@ document.addEventListener('DOMContentLoaded', async()=>{
   await loadToken();
 
   if(!TOKEN){
-    $('main-content').innerHTML='<div style="color:var(--red);padding:32px;text-align:center;font-size:1rem">⚠️ Token TMDB no encontrado — configura <strong>config.js</strong></div>';
+    $('main-content').innerHTML='<div style="color:var(--red);padding:32px;text-align:center">⚠️ Token TMDB no encontrado — configura <strong>config.js</strong></div>';
     hide('loader-ov'); return;
   }
 
@@ -72,12 +89,14 @@ async function loadToken(){
   if(window.TMDB_TOKEN) TOKEN=window.TMDB_TOKEN;
 }
 
-// ════ NETWORK DETECT ════
+// ══════════════════════════════════
+//  NETWORK DETECT
+// ══════════════════════════════════
 async function detectNet(){
   const dot=$('net-dot'), txt=$('net-txt');
   if(!dot||!txt) return;
   const nav=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
-  let label='Cargando...', color='#888';
+  let label='Midiendo...', color='#888';
 
   if(nav){
     const eff=nav.effectiveType||'', type=nav.type||'', down=nav.downlink||0;
@@ -86,6 +105,7 @@ async function detectNet(){
     else if(eff==='3g'||eff==='2g'){ label='⚠️ Lenta'; color='#ef4444'; }
     else { label='🌐 Red'; color='#888'; }
   }
+
   try{
     const t0=performance.now();
     await fetch('https://image.tmdb.org/t/p/w92/wwemzKWzjKYJFfCeiB57q3r4Bcm.png',{cache:'no-store',mode:'no-cors'});
@@ -93,30 +113,31 @@ async function detectNet(){
     if(!nav){
       if(ms<450){ label='📶 Rápida'; color='#22c55e'; }
       else if(ms<1300){ label='📡 Media'; color='#f59e0b'; }
-      else{ label='⚠️ Lenta'; color='#ef4444'; }
+      else { label='⚠️ Lenta'; color='#ef4444'; }
     }
-    if(nav&&(nav.type==='wifi'||nav.effectiveType==='4g')&&ms>1100){ label='🔒 VPN'; color='#a78bfa'; }
+    if(nav&&(nav.type==='wifi'||nav.effectiveType==='4g')&&ms>1200){ label='🔒 VPN'; color='#a78bfa'; }
   }catch(e){}
 
   dot.style.background=color; txt.textContent=label;
   setTimeout(detectNet, 30000);
 }
 
-// ════ FAVORITES ════
+// ══════════════════════════════════
+//  FAVORITES
+// ══════════════════════════════════
 const FAV_KEY='shocktv_favs';
 function loadFavs(){ try{ favs=JSON.parse(localStorage.getItem(FAV_KEY)||'{}'); }catch(e){ favs={}; } updateFavCount(); }
-function saveFavs(){ try{ localStorage.setItem(FAV_KEY, JSON.stringify(favs)); }catch(e){} updateFavCount(); }
+function saveFavs(){ try{ localStorage.setItem(FAV_KEY,JSON.stringify(favs)); }catch(e){} updateFavCount(); }
 function favKey(type,id){ return `${type}-${id}`; }
 function isFav(type,id){ return !!favs[favKey(type,id)]; }
+
 function toggleFav(type,id,title,poster,rating){
   const k=favKey(type,id);
   if(favs[k]){ delete favs[k]; toast('Eliminado de favoritos'); }
   else{ favs[k]={id,type,title,poster,rating}; toast('❤️ Añadido a favoritos'); }
   saveFavs();
-  // Refresh fav button in modal if open
   const fb=$('fav-modal-btn');
-  if(fb){ fb.classList.toggle('active', isFav(type,id)); fb.textContent=isFav(type,id)?'❤️ En favoritos':'🤍 Favoritos'; }
-  // Refresh cards
+  if(fb){ fb.classList.toggle('active',isFav(type,id)); fb.textContent=isFav(type,id)?'❤️ En favoritos':'🤍 Favoritos'; }
   document.querySelectorAll(`.fav-heart[data-key="${k}"]`).forEach(h=>{
     h.classList.toggle('active',!!favs[k]); h.textContent=favs[k]?'❤️':'🤍';
   });
@@ -132,21 +153,27 @@ function renderFavs(){
   el.innerHTML=items.map(i=>card(i,i.type)).join('');
 }
 
-// ════ SIDEBAR ════
+// ══════════════════════════════════
+//  SIDEBAR
+// ══════════════════════════════════
 function openSidebar(){ $('sidebar').classList.add('open'); $('sb-overlay').classList.add('open'); document.body.style.overflow='hidden'; }
 function closeSidebar(){ $('sidebar').classList.remove('open'); $('sb-overlay').classList.remove('open'); document.body.style.overflow=''; }
 
-// ════ NAV ACTIVE ════
-const NAV_MAP={ home:'nb-home', fav:'nb-fav', movies:'nb-movies', tv:'nb-tv', anime:'nb-anime', toprated:'nb-toprated' };
-const SBI_MAP={ home:'sbi-home', fav:'sbi-fav', movies:'sbi-movies', tv:'sbi-tv', anime:'sbi-anime', toprated:'sbi-toprated' };
+// ══════════════════════════════════
+//  NAV ACTIVE
+// ══════════════════════════════════
+const NAV_IDS={ home:'nb-home',fav:'nb-fav',movies:'nb-movies',tv:'nb-tv',anime:'nb-anime' };
+const SBI_IDS={ home:'sbi-home',fav:'sbi-fav',movies:'sbi-movies',tv:'sbi-tv',anime:'sbi-anime',toprated:'sbi-toprated' };
 function setNavActive(sec){
-  Object.values(NAV_MAP).forEach(id=>$(id)?.classList.remove('active'));
-  Object.values(SBI_MAP).forEach(id=>$(id)?.classList.remove('active'));
-  if(NAV_MAP[sec]) $(NAV_MAP[sec])?.classList.add('active');
-  if(SBI_MAP[sec]) $(SBI_MAP[sec])?.classList.add('active');
+  Object.values(NAV_IDS).forEach(id=>$(id)?.classList.remove('active'));
+  Object.values(SBI_IDS).forEach(id=>$(id)?.classList.remove('active'));
+  if(NAV_IDS[sec]) $(NAV_IDS[sec])?.classList.add('active');
+  if(SBI_IDS[sec]) $(SBI_IDS[sec])?.classList.add('active');
 }
 
-// ════ SECTIONS ════
+// ══════════════════════════════════
+//  SECTIONS
+// ══════════════════════════════════
 const ALL_SEC=['home-sections','movies-section','tv-section','anime-section','toprated-section','search-section','genre-section','fav-section'];
 function hideAll(){ ALL_SEC.forEach(hide); $('hero-section').style.display='none'; }
 
@@ -161,10 +188,10 @@ function setSection(sec){
   hideAll(); setNavActive(sec); closeSidebar();
   window.scrollTo({top:0,behavior:'smooth'});
   const map={
-    fav:      ()=>{ show('fav-section');    renderFavs(); },
+    fav:      ()=>{ show('fav-section'); renderFavs(); },
     movies:   ()=>{ show('movies-section'); loadGrid('movies-grid','movie'); },
-    tv:       ()=>{ show('tv-section');     loadGrid('tv-grid','tv'); },
-    anime:    ()=>{ show('anime-section');  loadAnimeGrid(); },
+    tv:       ()=>{ show('tv-section'); loadGrid('tv-grid','tv'); },
+    anime:    ()=>{ show('anime-section'); loadAnimeGrid(); },
     toprated: ()=>{ show('toprated-section'); loadTopRated(); },
   };
   map[sec]?.();
@@ -177,20 +204,31 @@ async function setGenre(type,genreId,label){
   try{
     const d=await tmdb(`/discover/${type}?language=es-ES&with_genres=${genreId}&sort_by=popularity.desc`);
     $('genre-grid').innerHTML=(d.results||[]).map(i=>card(i,type)).join('')||nores();
-  }catch(e){ $('genre-grid').innerHTML=err(e); }
+  }catch(e){ $('genre-grid').innerHTML=errBox(e); }
 }
 
 async function setAnimeGenre(genreId,label){
   hideAll(); show('genre-section'); $('genre-title').textContent='⛩️ Anime · '+label;
   $('genre-grid').innerHTML=spin(); closeSidebar();
   window.scrollTo({top:0,behavior:'smooth'});
+  // Usar Jikan con genre_ids de MAL (map de géneros)
+  const malGenreMap={28:1,12:2,14:10,878:24,35:4,10749:22,27:7,18:8,9648:7};
+  const malId=malGenreMap[genreId]||1;
   try{
-    const d=await tmdb(`/discover/tv?language=es-ES&with_keywords=${ANIME_KW}&with_genres=${genreId}&sort_by=popularity.desc`);
-    $('genre-grid').innerHTML=(d.results||[]).map(i=>card(i,'tv',true)).join('')||nores();
-  }catch(e){ $('genre-grid').innerHTML=err(e); }
+    const d=await jikan(`/anime?genres=${malId}&order_by=popularity&sort=asc&limit=24&sfw=true`);
+    $('genre-grid').innerHTML=(d.data||[]).map(i=>cardJikan(i)).join('')||nores();
+  }catch(e){
+    // Fallback TMDB
+    try{
+      const d=await tmdb(`/discover/tv?language=es-ES&with_keywords=${ANIME_KW}&with_genres=${genreId}&sort_by=popularity.desc`);
+      $('genre-grid').innerHTML=(d.results||[]).map(i=>card(i,'tv',true)).join('')||nores();
+    }catch(e2){ $('genre-grid').innerHTML=errBox(e2); }
+  }
 }
 
-// ════ HOME ════
+// ══════════════════════════════════
+//  HOME
+// ══════════════════════════════════
 async function loadHome(){
   try{
     const [tm,ttv,mp,tvp]=await Promise.all([
@@ -205,23 +243,37 @@ async function loadHome(){
     renderSlider('s-trend',trending,true);
     renderSlider('s-mov',mp.results||[]);
     renderSlider('s-tv',ttv.results||[],false,true);
-  }catch(e){ console.error('loadHome',e); }
+  }catch(e){ console.error('loadHome TMDB:',e); }
 
-  // Anify — async, no bloquea
-  loadAnifyHome();
+  // Jikan (async, no bloquea hero)
+  loadJikanHome();
 }
 
-async function loadAnifyHome(){
+async function loadJikanHome(){
   try{
-    const d=await anify('/seasonal/anime?fields=id,title,coverImage,bannerImage,rating,status,currentEpisode,year,description');
-    const trending=(d.trending||[]).slice(0,20);
-    const seasonal=(d.seasonal||[]).slice(0,20);
-    if(trending.length) renderSlider('s-anime', trending, false, false, true, true);
-    if(seasonal.length) renderSlider('s-anime2', seasonal, false, false, true, true);
-  }catch(e){ console.warn('Anify no disponible:', e.message); }
+    // Trending (top airing)
+    const trending=await jikan('/top/anime?filter=airing&limit=20');
+    if(trending.data?.length){
+      renderSlider('s-anime', trending.data, false, false, false, true);
+    }
+    // Pequeña pausa para no superar rate limit de Jikan (3 req/s)
+    await sleep(400);
+    // Esta temporada
+    const seasonal=await jikan('/seasons/now?limit=20');
+    if(seasonal.data?.length){
+      renderSlider('s-anime2', seasonal.data, false, false, false, true);
+    }
+  }catch(e){
+    console.warn('Jikan error:', e.message);
+    // Mostrar mensaje amigable en los sliders
+    $('s-anime').innerHTML  = '<div style="color:var(--muted);padding:16px;font-size:.82rem">⚠️ Jikan no disponible momentáneamente</div>';
+    $('s-anime2').innerHTML = '<div style="color:var(--muted);padding:16px;font-size:.82rem">⚠️ Jikan no disponible momentáneamente</div>';
+  }
 }
 
-// ════ HERO ════
+// ══════════════════════════════════
+//  HERO
+// ══════════════════════════════════
 function renderHero(item,type){
   $('hero-bg').style.backgroundImage=item.backdrop_path?`url(${IMG_ORI+item.backdrop_path})`:'';
   $('hero-title').textContent=item.title||item.name||'';
@@ -236,18 +288,19 @@ function startHero(){
   heroTimer=setInterval(()=>{ heroIdx=(heroIdx+1)%heroItems.length; renderHero(heroItems[heroIdx],'movie'); },7000);
 }
 
-// ════ SLIDERS ════
-function renderSlider(id,items,mixed=false,isTV=false,isAnime=false,fromAnify=false){
+// ══════════════════════════════════
+//  SLIDERS / GRIDS
+// ══════════════════════════════════
+function renderSlider(id,items,mixed=false,isTV=false,isAnime=false,fromJikan=false){
   const c=$(id); if(!c) return;
   c.innerHTML=(items||[]).map(i=>{
-    if(fromAnify) return cardAnify(i);
+    if(fromJikan) return cardJikan(i);
     const type=mixed?(i.media_type||'movie'):(isTV?'tv':'movie');
     return card(i,type,isAnime);
   }).join('');
 }
 function slide(id,dir){ const s=$(id); if(s) s.scrollBy({left:dir*154*3,behavior:'smooth'}); }
 
-// ════ GRIDS ════
 async function loadGrid(gridId,type){
   const el=$(gridId); if(!el||el.dataset.loaded) return; el.dataset.loaded=1;
   el.innerHTML=spin();
@@ -255,33 +308,43 @@ async function loadGrid(gridId,type){
     const path=type==='movie'?'/movie/popular?language=es-ES':'/tv/popular?language=es-ES';
     const d=await tmdb(path);
     el.innerHTML=(d.results||[]).map(i=>card(i,type)).join('');
-  }catch(e){ el.innerHTML=err(e); }
+  }catch(e){ el.innerHTML=errBox(e); }
 }
+
 async function loadAnimeGrid(){
   const el=$('anime-grid'); if(!el||el.dataset.loaded) return; el.dataset.loaded=1;
   el.innerHTML=spin();
   try{
-    const d=await anify('/seasonal/anime?fields=id,title,coverImage,rating,status,currentEpisode,year');
-    const items=[...(d.trending||[]),...(d.seasonal||[])].slice(0,40);
-    el.innerHTML=items.map(i=>cardAnify(i)).join('');
+    const [top,season]=await Promise.all([
+      jikan('/top/anime?filter=airing&limit=20'),
+      jikan('/seasons/now?limit=20'),
+    ]);
+    const all=[...(top.data||[]),...(season.data||[])];
+    // Deduplicar por mal_id
+    const seen=new Set(); const unique=all.filter(a=>{ if(seen.has(a.mal_id)) return false; seen.add(a.mal_id); return true; });
+    el.innerHTML=unique.slice(0,40).map(i=>cardJikan(i)).join('');
   }catch(e){
+    console.warn('Jikan error en anime grid:', e.message);
     // Fallback TMDB
     try{
       const d=await tmdb(`/discover/tv?language=es-ES&with_keywords=${ANIME_KW}&sort_by=popularity.desc`);
       el.innerHTML=(d.results||[]).map(i=>card(i,'tv',true)).join('');
-    }catch(e2){ el.innerHTML=err(e2); }
+    }catch(e2){ el.innerHTML=errBox(e2); }
   }
 }
+
 async function loadTopRated(){
   const el=$('toprated-grid'); if(!el||el.dataset.loaded) return; el.dataset.loaded=1;
   el.innerHTML=spin();
   try{
     const d=await tmdb('/movie/top_rated?language=es-ES');
     el.innerHTML=(d.results||[]).map(i=>card(i,'movie')).join('');
-  }catch(e){ el.innerHTML=err(e); }
+  }catch(e){ el.innerHTML=errBox(e); }
 }
 
-// ════ CARD (TMDB) ════
+// ══════════════════════════════════
+//  CARDS
+// ══════════════════════════════════
 function card(item,type,isAnime=false){
   const title=esc(item.title||item.name||'Sin título');
   const rating=item.vote_average?.toFixed(1)||'?';
@@ -293,42 +356,57 @@ function card(item,type,isAnime=false){
   return `<div class="card" onclick="openDetail('${type}',${item.id},${isAnime})">${img}
     <span class="card-tag${isAnime?' anime-tag':''}">${tag}</span>
     <button class="fav-heart${isFav(type,item.id)?' active':''}" data-key="${k}"
-      onclick="event.stopPropagation();toggleFav('${type}',${item.id},'${title.replace(/'/g,"\\'")}','${item.poster_path||''}',${item.vote_average||0})"
-    >${isFav(type,item.id)?'❤️':'🤍'}</button>
+      onclick="event.stopPropagation();toggleFav('${type}',${item.id},'${title.replace(/'/g,"\\'")}','${item.poster_path||''}',${item.vote_average||0})">
+      ${isFav(type,item.id)?'❤️':'🤍'}
+    </button>
     <div class="card-ov"><div class="card-title">${title}</div><div class="card-rat">★ ${rating}</div></div>
   </div>`;
 }
 
-// ════ CARD (ANIFY) ════
-function cardAnify(item){
-  const title=esc(item.title?.english||item.title?.romaji||item.title?.native||'Sin título');
-  const rating=(item.rating?.anilist||item.rating?.mal||0);
-  const ratingStr=rating?((rating/10).toFixed(1)):'?';
-  const poster=item.coverImage||'';
-  const id=item.id||'';
+// Card desde Jikan (MAL)
+function cardJikan(item){
+  const title=esc(item.title_english||item.title||'Sin título');
+  const rating=item.score?item.score.toFixed(1):'?';
+  const malId=item.mal_id;
+  const poster=item.images?.jpg?.large_image_url||item.images?.jpg?.image_url||'';
   const img=poster
     ?`<img class="card-img" src="${poster}" alt="${title}" loading="lazy" onerror="this.className='card-ph'">`
     :`<div class="card-ph"></div>`;
-  return `<div class="card" onclick="openAnifyDetail('${id}','${title.replace(/'/g,"\\'")}')">${img}
+  return `<div class="card" onclick="openJikanDetail(${malId},'${title.replace(/'/g,"\\'")}')">${img}
     <span class="card-tag anime-tag">Anime</span>
-    <div class="card-ov"><div class="card-title">${title}</div><div class="card-rat">★ ${ratingStr}</div></div>
+    <div class="card-ov"><div class="card-title">${title}</div><div class="card-rat">★ ${rating}</div></div>
   </div>`;
 }
 
-// ════ SEARCH ════
+// ══════════════════════════════════
+//  SEARCH
+// ══════════════════════════════════
 async function doSearch(){
   const q=$('search-input').value.trim(); if(!q) return;
   hideAll(); show('search-section');
   $('search-title').textContent=`Resultados: "${q}"`;
   $('search-results').innerHTML=spin();
+
   try{
-    const d=await tmdb('/search/multi?query='+encodeURIComponent(q)+'&language=es-ES');
-    const res=(d.results||[]).filter(i=>i.media_type!=='person');
-    $('search-results').innerHTML=res.length?res.map(i=>card(i,i.media_type||'movie')).join(''):nores();
-  }catch(e){ $('search-results').innerHTML=err(e); }
+    // Buscar en TMDB y Jikan en paralelo
+    const [tmdbRes, jikanRes] = await Promise.allSettled([
+      tmdb('/search/multi?query='+encodeURIComponent(q)+'&language=es-ES'),
+      jikan('/anime?q='+encodeURIComponent(q)+'&limit=8&sfw=true'),
+    ]);
+    const tmdbItems=(tmdbRes.status==='fulfilled'?(tmdbRes.value.results||[]).filter(i=>i.media_type!=='person'):[]);
+    const jikanItems=(jikanRes.status==='fulfilled'?jikanRes.value.data||[]:[]);
+
+    const html=[
+      ...tmdbItems.map(i=>card(i,i.media_type||'movie')),
+      ...jikanItems.map(i=>cardJikan(i)),
+    ].join('');
+    $('search-results').innerHTML=html||nores();
+  }catch(e){ $('search-results').innerHTML=errBox(e); }
 }
 
-// ════ DETAIL MODAL ════
+// ══════════════════════════════════
+//  DETAIL MODAL — TMDB
+// ══════════════════════════════════
 async function openDetail(type,id,isAnime=false){
   show('loader-ov');
   try{
@@ -361,35 +439,42 @@ async function openDetail(type,id,isAnime=false){
     $('modal-cast').innerHTML=cast.length?`<div class="cast-t">Reparto</div><div class="cast-list">${cast.map(a=>`<span class="cast-chip">${esc(a.name)}</span>`).join('')}</div>`:'';
     $('modal').scrollTop=0;
     show('modal-ov'); document.body.style.overflow='hidden';
-  }catch(e){ console.error(e); }
+  }catch(e){ console.error(e); toast('Error al cargar detalles'); }
   finally{ hide('loader-ov'); }
 }
 
-// ════ ANIFY DETAIL ════
-async function openAnifyDetail(anifyId,title){
+// ══════════════════════════════════
+//  DETAIL MODAL — JIKAN (Anime MAL)
+// ══════════════════════════════════
+async function openJikanDetail(malId, fallbackTitle=''){
   show('loader-ov');
   try{
-    const det=await anify(`/info/${anifyId}?fields=id,title,coverImage,bannerImage,rating,description,genres,year,currentEpisode,mappings`);
-    const t=det.title?.english||det.title?.romaji||title;
-    const rat=(det.rating?.anilist||det.rating?.mal||0);
-    // Try to find AniList id from mappings for player
-    const anilistMapping=(det.mappings||[]).find(m=>m.providerId==='anilist');
-    const aniId=anilistMapping?.id||anifyId;
+    const det=await jikan(`/anime/${malId}/full`);
+    const d=det.data||{};
+    const title=d.title_english||d.title||fallbackTitle;
+    const year=d.year||'';
+    const rating=d.score?d.score.toFixed(1):'N/A';
+    const genres=(d.genres||[]).map(g=>g.name);
+    const studios=(d.studios||[]).map(s=>s.name).join(', ');
+    const eps=d.episodes?`${d.episodes} eps`:'';
 
-    if(det.bannerImage||det.coverImage) $('modal-back').style.backgroundImage=`url(${det.bannerImage||det.coverImage})`;
-    $('modal-poster').src=det.coverImage||'';
-    $('modal-poster').alt=t;
-    $('modal-tags').innerHTML=(det.genres||[]).map(g=>`<span class="badge">${g}</span>`).join('');
-    $('modal-title').textContent=t;
-    $('modal-meta').innerHTML=`<span class="star">★ ${rat?(rat/10).toFixed(1):'N/A'}</span>${det.year?`<span>📅 ${det.year}</span>`:''}<span>⛩️ Anime</span>${det.currentEpisode?`<span>📺 ${det.currentEpisode} eps</span>`:''}`;
-    $('modal-ov-txt').textContent=det.description||'Sin descripción.';
-    $('modal-actions').innerHTML=`<button class="watch-btn" onclick="closeModal();openAnifyPlayer('${aniId}','${esc(t)}')">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Ver ahora
-    </button>`;
+    $('modal-back').style.backgroundImage=d.trailer?.images?.large_image_url
+      ?`url(${d.trailer.images.large_image_url})`
+      :(d.images?.jpg?.large_image_url?`url(${d.images.jpg.large_image_url})`:'');
+    $('modal-poster').src=d.images?.jpg?.large_image_url||d.images?.jpg?.image_url||'';
+    $('modal-poster').alt=title;
+    $('modal-tags').innerHTML=genres.map(g=>`<span class="badge">${g}</span>`).join('');
+    $('modal-title').textContent=title;
+    $('modal-meta').innerHTML=`<span class="star">★ ${rating}</span>${year?`<span>📅 ${year}</span>`:''}${eps?`<span>📺 ${eps}</span>`:''}<span>⛩️ Anime</span>${studios?`<span>🎬 ${studios}</span>`:''}`;
+    $('modal-ov-txt').textContent=d.synopsis||'Sin sinopsis.';
+    $('modal-actions').innerHTML=`
+      <button class="watch-btn" onclick="closeModal();openAnimePlayer(${malId},'${esc(title)}')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Ver ahora
+      </button>`;
     $('modal-cast').innerHTML='';
     $('modal').scrollTop=0;
     show('modal-ov'); document.body.style.overflow='hidden';
-  }catch(e){ console.error(e); }
+  }catch(e){ console.error(e); toast('Error al cargar anime'); }
   finally{ hide('loader-ov'); }
 }
 
@@ -398,10 +483,12 @@ function closeModal(event){
   hide('modal-ov'); document.body.style.overflow='';
 }
 
-// ════ PLAYER — Películas/Series (Unlimplay) ════
+// ══════════════════════════════════
+//  PLAYER — Películas / Series
+// ══════════════════════════════════
 async function openPlayer(type,id,title,isAnime=false){
   show('loader-ov');
-  pl={ type,tmdbId:id,s:1,ep:1,seasons:[],title:title||'',isAnime,aniId:null,lang:'sub' };
+  pl={ type,tmdbId:id,malId:null,latSlug:null,s:1,ep:1,seasons:[],title:title||'',isAnime,lang:'sub',srcMode:'mega' };
 
   if(type==='tv'){
     try{
@@ -418,32 +505,71 @@ async function openPlayer(type,id,title,isAnime=false){
   show('ply-overlay'); document.body.style.overflow='hidden';
 }
 
-// ════ PLAYER — Anime (MegaPlay via AniList ID) ════
-function openAnifyPlayer(anilistId,title){
-  pl={ type:'anime',tmdbId:0,s:1,ep:1,seasons:[],title:title||'',isAnime:true,aniId:anilistId,lang:'sub' };
-  hide('ply-tv');
+// ══════════════════════════════════
+//  PLAYER — Anime (MAL ID)
+// ══════════════════════════════════
+function openAnimePlayer(malId, title){
+  pl={ type:'anime', tmdbId:0, malId, latSlug:null, s:1, ep:1, seasons:[], title:title||'', isAnime:true, lang:'sub', srcMode:'mega' };
+
+  // Episode selector manual
+  show('ply-tv');
+  const ss=$('sel-season'), se=$('sel-ep');
+  ss.innerHTML='<option value="1">Temporada 1</option>';
+  se.innerHTML=Array.from({length:100},(_,i)=>`<option value="${i+1}">Episodio ${i+1}</option>`).join('');
+  se.value=1;
+
   show('ply-lang');
+  // Mostrar también botones de fuente (Latino incluido)
+  renderAnimeSourceBtns();
+
   $('ply-ttl').textContent=pl.title;
-  $('ply-ep').textContent='Ep 1';
-  // Build episode select manually
-  buildAnimeEpSel();
+  $('ply-ep').textContent='T1 · Ep1';
   loadFrame();
   hide('modal-ov');
   show('ply-overlay'); document.body.style.overflow='hidden';
 }
 
-function buildAnimeEpSel(){
-  show('ply-tv');
-  const s=$('sel-season'), e=$('sel-ep');
-  s.innerHTML='<option value="1">Temporada 1</option>';
-  e.innerHTML=Array.from({length:100},(_,i)=>`<option value="${i+1}">Episodio ${i+1}</option>`).join('');
-  e.value=pl.ep;
+function renderAnimeSourceBtns(){
+  // Si existe el contenedor de fuentes lo usamos, si no lo creamos
+  let bar=$('anime-src-bar');
+  if(!bar){
+    bar=document.createElement('div');
+    bar.id='anime-src-bar';
+    bar.style.cssText='display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--s2);border-top:1px solid rgba(255,255,255,.05);flex-shrink:0;flex-wrap:wrap;';
+    bar.innerHTML='<span style="font-size:.68rem;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase">Fuente:</span>';
+    $('ply-box').appendChild(bar);
+  }
+  const btns=[
+    { id:'mega', label:'MegaPlay (Sub/Dub)' },
+    { id:'lat',  label:'🇦🇷 LATanime (Latino)' },
+  ];
+  // Limpiar botones previos
+  bar.querySelectorAll('.src-mode-btn').forEach(b=>b.remove());
+  btns.forEach(b=>{
+    const btn=document.createElement('button');
+    btn.className='src-mode-btn lang-btn'+(pl.srcMode===b.id?' active':'');
+    btn.textContent=b.label;
+    btn.onclick=()=>{ pl.srcMode=b.id; renderAnimeSourceBtns(); loadFrame(); };
+    bar.appendChild(btn);
+  });
 }
 
+// ══════════════════════════════════
+//  FRAME LOADER
+// ══════════════════════════════════
 function loadFrame(){
   const f=$('ply-frame');
-  if(pl.isAnime && pl.aniId){
-    f.src=SRC_ANIME(pl.aniId, pl.ep, pl.lang);
+  if(pl.isAnime){
+    if(pl.srcMode==='lat'){
+      // LATanime: usamos megaplay con dub como proxy dado que latanime no tiene embed público
+      // Usamos un iframe apuntando a latanime buscando por título
+      f.src=`https://latanime.org/`;
+      // Mostrar mensaje orientativo
+      $('ply-ep').textContent='Buscá "'+pl.title+'" en LATanime →';
+      return;
+    }
+    // MegaPlay via MAL ID
+    f.src=SRC_ANIME_MEGA(pl.malId, pl.ep, pl.lang);
   } else if(pl.type==='movie'){
     f.src=SRC_MOVIE(pl.tmdbId);
   } else {
@@ -487,15 +613,18 @@ function updateEpBadge(){
   $('ply-ep').textContent=(pl.type==='tv'||pl.isAnime)?`T${pl.s} · Ep${pl.ep}`:'';
 }
 function closePlayer(){
-  hide('ply-overlay'); $('ply-frame').src=''; document.body.style.overflow='';
+  hide('ply-overlay');
+  $('ply-frame').src='';
+  // Limpiar barra de fuentes anime
+  const bar=$('anime-src-bar'); if(bar) bar.remove();
+  document.body.style.overflow='';
 }
 
-// ── Keyboard ──
-document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){ closePlayer(); closeModal(); }
-});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closePlayer(); closeModal(); } });
 
-// ════ HELPERS ════
-const spin=()=>`<div style="display:flex;align-items:center;justify-content:center;padding:44px;color:var(--muted)"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0"/></svg></div>`;
-const err =e=>`<div style="color:var(--red);padding:18px;font-size:.86rem;grid-column:1/-1">⚠️ ${esc(String(e.message||e))}</div>`;
-const nores=()=>`<div style="color:var(--muted);padding:18px;grid-column:1/-1">Sin resultados.</div>`;
+// ══════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════
+const spin  = () => `<div style="display:flex;align-items:center;justify-content:center;padding:44px;color:var(--muted);grid-column:1/-1"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0"/></svg></div>`;
+const errBox = e => `<div style="color:var(--red);padding:18px;font-size:.86rem;grid-column:1/-1">⚠️ ${esc(String(e?.message||e))}</div>`;
+const nores  = () => `<div style="color:var(--muted);padding:18px;grid-column:1/-1">Sin resultados.</div>`;
