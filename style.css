@@ -189,3 +189,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 }
 @media(max-width:390px){.nav-search input{width:108px}.hero-title{font-size:2rem}.hero-btns{flex-direction:column}.btn-play,.btn-info{justify-content:center}}
 @media(hover:none){.card:hover{transform:none;box-shadow:none}.card:active{transform:scale(.96);transition:transform .1s}.sl-btn{display:none}.fav-heart{opacity:1}}
+
+/* ── Mini Card Modal ── */
+#mini-ov { animation: fadein .18s; }
+#mini-ov button:active { opacity: .85; transform: scale(.97); }
