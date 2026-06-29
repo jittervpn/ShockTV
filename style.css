@@ -193,3 +193,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 /* ── Mini Card Modal ── */
 #mini-ov { animation: fadein .18s; }
 #mini-ov button:active { opacity: .85; transform: scale(.97); }
+
+/* Ep button sin embed disponible */
+.ep-btn.no-embed { opacity: .45; }
+.ep-btn.no-embed:hover { opacity: .7; }
