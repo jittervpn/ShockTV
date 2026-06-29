@@ -21,7 +21,7 @@ const SRC_ANIME  = (malId,ep,lang) => `https://megaplay.buzz/stream/mal/${malId}
 // ── State ──
 let TOKEN='';
 let heroItems=[],heroIdx=0,heroTimer=null;
-let pl={type:'',tmdbId:0,malId:null,s:1,ep:1,seasons:[],title:'',isAnime:false,lang:'es',totalEps:0};
+let pl={type:'',tmdbId:0,malId:null,s:1,ep:1,seasons:[],title:'',isAnime:false,lang:'es',totalEps:0,cachedEps:null};
 let favs={};
 // Progress tracker: { "anime-{malId}-{ep}": { watched:bool, progress:0-100 } }
 let progress={};
@@ -169,9 +169,9 @@ async function detectNet(){
   const nav=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
   let label='...',color='#888';
   if(nav){
-    const{effectiveType:eff='',type:'',downlink:dl=0}=nav;
-    if(nav.type==='wifi'||(dl>5&&(eff==='4g'||eff==='5g'))){label='📶 WiFi';color='#22c55e';}
-    else if(nav.type==='cellular'||eff==='4g'){label='📱 4G';color='#f59e0b';}
+    const eff=nav.effectiveType||''; const connType=nav.type||''; const dl=nav.downlink||0;
+    if(connType==='wifi'||(dl>5&&(eff==='4g'||eff==='5g'))){label='📶 WiFi';color='#22c55e';}
+    else if(connType==='cellular'||eff==='4g'){label='📱 4G';color='#f59e0b';}
     else if(eff==='3g'||eff==='2g'){label='⚠️ Lenta';color='#ef4444';}
     else{label='🌐 Red';color='#888';}
   }
@@ -180,7 +180,7 @@ async function detectNet(){
     await fetch('https://image.tmdb.org/t/p/w92/wwemzKWzjKYJFfCeiB57q3r4Bcm.png',{cache:'no-store',mode:'no-cors'});
     const ms=performance.now()-t0;
     if(!nav){if(ms<450){label='📶 Rápida';color='#22c55e';}else if(ms<1300){label='📡 Media';color='#f59e0b';}else{label='⚠️ Lenta';color='#ef4444';}}
-    if(nav&&nav.type==='wifi'&&ms>1200){label='🔒 VPN';color='#a78bfa';}
+    if(nav&&connType==='wifi'&&ms>1200){label='🔒 VPN';color='#a78bfa';}
   }catch(e){}
   dot.style.background=color;txt.textContent=label;
   setTimeout(detectNet,30000);
@@ -539,10 +539,12 @@ async function loadSeasonEps(season){
     const d=await tmdb(`/tv/${pl.tmdbId}/season/${season}?language=es-ES`);
     const eps=d.episodes||[];
     pl.totalEps=eps.length;
+    pl.cachedEps=eps;
     renderTVEpGrid(eps);
   }catch(e){
-    // Fallback
-    renderTVEpGrid(Array.from({length:24},(_,i)=>({episode_number:i+1,name:''})));
+    const eps=Array.from({length:24},(_,i)=>({episode_number:i+1,name:''}));
+    pl.cachedEps=eps;
+    renderTVEpGrid(eps);
   }
 }
 
@@ -599,13 +601,11 @@ function playAnimeEp(ep){
 }
 function refreshEpGrid(){
   if(pl.isAnime)loadAnimeEpGrid(pl.totalEps);
-  else{
-    tmdb(`/tv/${pl.tmdbId}/season/${pl.s}?language=es-ES`).then(d=>renderTVEpGrid(d.episodes||[])).catch(()=>{});
-  }
+  else if(pl.cachedEps)renderTVEpGrid(pl.cachedEps);
 }
 function scrollToActiveEp(){
   setTimeout(()=>{
-    const active=$('.ep-btn.playing');
+    const active=document.querySelector('.ep-btn.playing');
     if(active)active.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
   },100);
 }
