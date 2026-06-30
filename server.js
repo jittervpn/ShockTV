@@ -1,105 +1,101 @@
+// ═══════════════════════════════════════════════
+//  ShockTV Server — TMDB proxy + Anime1v API
+// ═══════════════════════════════════════════════
+require('dotenv').config();
 const express = require('express');
-const https   = require('https');
 const path    = require('path');
 const fs      = require('fs');
-try { require('dotenv').config(); } catch(e){}
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
-const TMDB_TOKEN = (process.env.TMDB_TOKEN || '').trim();
+const TMDB_TOKEN  = (process.env.TMDB_TOKEN  || '').trim();
+// Anime1v API Key interna — usamos una fija ya que es nuestro propio servidor
+const ANIME_KEY   = process.env.ANIME_API_KEY || 'shocktv-internal-key';
 
-console.log('ShockTV | PORT:', PORT, '| TOKEN:', TMDB_TOKEN ? 'OK' : 'MISSING');
+app.use(express.json());
 
+// ── Archivos estáticos ──
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 app.get('/', serveIndex);
 app.get('/index.html', serveIndex);
-
 function serveIndex(req, res) {
   let html = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
-  html = html.replace('</head>', `<script>window.__TMDB_TOKEN__="${TMDB_TOKEN}";</script></head>`);
+  html = html.replace('</head>',
+    `<script>window.__TMDB_TOKEN__="${TMDB_TOKEN}";window.__ANIME_KEY__="${ANIME_KEY}";</script></head>`);
   res.setHeader('Content-Type', 'text/html').send(html);
 }
 
-// ── Fetch helper ──
-function fetchJSON(url, headers = {}) {
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const opts = {
-      hostname: u.hostname, path: u.pathname + u.search, method: 'GET',
-      headers: { 'User-Agent': 'ShockTV/1.0', 'Accept': 'application/json', ...headers }
-    };
-    const req = https.request(opts, r => {
-      let d = '';
-      r.on('data', c => d += c);
-      r.on('end', () => {
-        try { resolve(JSON.parse(d)); }
-        catch(e) { reject(new Error('JSON parse error: ' + d.slice(0,100))); }
-      });
-    });
-    req.on('error', reject);
-    req.setTimeout(10000, () => { req.destroy(); reject(new Error('timeout')); });
-    req.end();
-  });
+// ── Health / Token ──
+app.get('/api/health', (req, res) => res.json({ status:'ok', tmdb:!!TMDB_TOKEN }));
+app.get('/api/token',  (req, res) => {
+  if (!TMDB_TOKEN) return res.status(500).json({ error:'TMDB_TOKEN not set' });
+  res.json({ token: TMDB_TOKEN, animeKey: ANIME_KEY });
+});
+
+// ══════════════════════════════════════════════
+//  ANIME1V API — rutas integradas
+//  Endpoints:
+//    GET /api/anime/search?q=naruto
+//    GET /api/anime/info?url=https://animeav1.com/media/naruto
+//    GET /api/anime/episode?url=https://animeav1.com/media/naruto/1
+//    GET /api/anime/catalog?page=1
+// ══════════════════════════════════════════════
+const { ApiError } = require('./src/utils/api-error');
+const animeService = require('./src/services/anime.service');
+
+function asyncH(fn) {
+  return async (req, res, next) => {
+    try { await fn(req, res, next); }
+    catch(e) { next(e); }
+  };
 }
 
-// ── Proxy Anify → evita CORS en browser ──
-// GET /api/anify/episodes/:anifyId
-app.get('/api/anify/episodes/:id', async (req, res) => {
-  try {
-    const data = await fetchJSON(`https://api.anify.tv/episodes/${req.params.id}`);
-    res.json(data);
-  } catch(e) {
-    res.status(500).json({ error: e.message });
+// Auth simple: la key que inyectamos nosotros mismos
+function authAnime(req, res, next) {
+  const key = req.header('x-api-key') || req.query.apiKey || '';
+  if (key !== ANIME_KEY) {
+    return res.status(401).json({ success:false, message:'API Key inválida' });
   }
+  req.apiKey = key;
+  next();
+}
+
+app.get('/api/anime/search', authAnime, asyncH(async (req, res) => {
+  const { q, domain } = req.query;
+  if (!q) return res.status(400).json({ success:false, message:'Falta parámetro q' });
+  const data = await animeService.searchAnime(q, domain);
+  res.json(data);
+}));
+
+app.get('/api/anime/info', authAnime, asyncH(async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ success:false, message:'Falta parámetro url' });
+  const data = await animeService.getAnimeInfo(url);
+  res.json(data);
+}));
+
+app.get('/api/anime/episode', authAnime, asyncH(async (req, res) => {
+  const { url, includeMega, excludeServers } = req.query;
+  if (!url) return res.status(400).json({ success:false, message:'Falta parámetro url' });
+  const data = await animeService.getEpisodeLinks(url, includeMega, excludeServers);
+  res.json(data);
+}));
+
+app.get('/api/anime/catalog', authAnime, asyncH(async (req, res) => {
+  const data = await animeService.getCatalog?.(req.query.page, req.query.genre)
+    || { success:false, message:'No soportado' };
+  res.json(data);
+}));
+
+// Error handler
+app.use((err, req, res, next) => {
+  const status = err.statusCode || 500;
+  res.status(status).json({ success:false, message: err.message || 'Error interno' });
 });
 
-// GET /api/anify/sources?anifyId=xxx&episodeId=yyy&providerId=zzz&subType=dub
-app.get('/api/anify/sources', async (req, res) => {
-  const { anifyId, episodeId, providerId, subType = 'dub' } = req.query;
-  if (!anifyId || !episodeId || !providerId)
-    return res.status(400).json({ error: 'anifyId, episodeId, providerId required' });
-  try {
-    // Anify sources endpoint
-    const url = `https://api.anify.tv/sources?animeId=${anifyId}&episodeId=${encodeURIComponent(episodeId)}&providerId=${encodeURIComponent(providerId)}&subType=${subType}&id=${anifyId}`;
-    const data = await fetchJSON(url);
-    res.json(data);
-  } catch(e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// GET /api/anify/search?q=naruto&type=anime
-app.get('/api/anify/search', async (req, res) => {
-  const { q, type = 'anime' } = req.query;
-  if (!q) return res.json([]);
-  try {
-    const data = await fetchJSON(
-      `https://api.anify.tv/search/${type}/${encodeURIComponent(q)}?fields=[id,title,coverImage,currentEpisode,rating]`
-    );
-    res.json(data?.results || data || []);
-  } catch(e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// GET /api/anify/seasonal
-app.get('/api/anify/seasonal', async (req, res) => {
-  try {
-    const data = await fetchJSON(
-      'https://api.anify.tv/seasonal/anime?fields=[id,title,coverImage,bannerImage,currentEpisode,rating,status,year]'
-    );
-    res.json(data || {});
-  } catch(e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.get('/api/health', (req, res) => res.json({ status: 'ok', token: !!TMDB_TOKEN }));
-app.get('/api/token',  (req, res) => {
-  if (!TMDB_TOKEN) return res.status(500).json({ error: 'TMDB_TOKEN not set' });
-  res.json({ token: TMDB_TOKEN });
-});
-
+// SPA fallback
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-app.listen(PORT, '0.0.0.0', () => console.log(`✅ ShockTV :${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ ShockTV :${PORT} | TMDB:${TMDB_TOKEN?'OK':'MISSING'}`);
+});
