@@ -1,147 +1,105 @@
 const express = require('express');
+const https   = require('https');
 const path    = require('path');
 const fs      = require('fs');
 try { require('dotenv').config(); } catch(e){}
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
-const TMDB_TOKEN = (process.env.TMDB_TOKEN||'').trim();
+const TMDB_TOKEN = (process.env.TMDB_TOKEN || '').trim();
 
 console.log('ShockTV | PORT:', PORT, '| TOKEN:', TMDB_TOKEN ? 'OK' : 'MISSING');
 
-// ── Importar animeflv-api (si está disponible) ──
-let flvApi = null;
-try {
-  flvApi = require('animeflv-api');
-  console.log('✅ animeflv-api cargado');
-} catch(e) {
-  console.warn('⚠️  animeflv-api no disponible, usando scraper manual');
-}
-
-// ── Static + inject token ──
-app.use(express.static(path.join(__dirname,'public'),{index:false}));
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 app.get('/', serveIndex);
 app.get('/index.html', serveIndex);
-function serveIndex(req,res){
-  let html = fs.readFileSync(path.join(__dirname,'public','index.html'),'utf8');
-  html = html.replace('</head>',`<script>window.__TMDB_TOKEN__="${TMDB_TOKEN}";</script></head>`);
-  res.setHeader('Content-Type','text/html').send(html);
+
+function serveIndex(req, res) {
+  let html = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+  html = html.replace('</head>', `<script>window.__TMDB_TOKEN__="${TMDB_TOKEN}";</script></head>`);
+  res.setHeader('Content-Type', 'text/html').send(html);
 }
 
-// ── Health ──
-app.get('/api/health',(req,res)=>res.json({status:'ok',token:!!TMDB_TOKEN,flv:!!flvApi}));
-app.get('/api/token',(req,res)=>{
-  if(!TMDB_TOKEN) return res.status(500).json({error:'TMDB_TOKEN not set'});
-  res.json({token:TMDB_TOKEN});
-});
-
-// ── AnimeFLV: buscar anime ──
-// GET /api/anime/search?q=naruto
-app.get('/api/anime/search', async(req,res)=>{
-  const q = (req.query.q||'').trim();
-  if(!q) return res.json({data:[]});
-  if(!flvApi) return res.status(503).json({error:'flv not available'});
-  try {
-    const result = await flvApi.searchAnime(q);
-    // Normalizar campos
-    const data = (result?.data||[]).map(a=>({
-      id:    a.id,
-      title: a.title,
-      cover: a.cover,
-      synopsis: a.synopsis||'',
-      rating: a.rating||'',
-      type:  a.type||'Anime',
-      url:   a.url||''
-    }));
-    res.json({data});
-  } catch(e) {
-    console.error('[/api/anime/search]', e.message);
-    res.status(500).json({error:e.message});
-  }
-});
-
-// ── AnimeFLV: info de anime (sinopsis, géneros, episodios) ──
-// GET /api/anime/info?id=one-piece-tv
-app.get('/api/anime/info', async(req,res)=>{
-  const id = (req.query.id||'').trim();
-  if(!id) return res.status(400).json({error:'id required'});
-  if(!flvApi) return res.status(503).json({error:'flv not available'});
-  try {
-    const info = await flvApi.getAnimeInfo(id);
-    res.json({
-      id,
-      title:    info.title||'',
-      synopsis: info.synopsis||'',
-      cover:    info.cover||'',
-      rating:   info.rating||'',
-      genres:   info.genres||[],
-      status:   info.status||'',
-      episodes: (info.episodes||[]).map(e=>({index:e.index,id:e.id}))
+// ── Fetch helper ──
+function fetchJSON(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const opts = {
+      hostname: u.hostname, path: u.pathname + u.search, method: 'GET',
+      headers: { 'User-Agent': 'ShockTV/1.0', 'Accept': 'application/json', ...headers }
+    };
+    const req = https.request(opts, r => {
+      let d = '';
+      r.on('data', c => d += c);
+      r.on('end', () => {
+        try { resolve(JSON.parse(d)); }
+        catch(e) { reject(new Error('JSON parse error: ' + d.slice(0,100))); }
+      });
     });
-  } catch(e) {
-    console.error('[/api/anime/info]', e.message);
-    res.status(500).json({error:e.message});
-  }
-});
+    req.on('error', reject);
+    req.setTimeout(10000, () => { req.destroy(); reject(new Error('timeout')); });
+    req.end();
+  });
+}
 
-// ── AnimeFLV: videos de un episodio ──
-// GET /api/anime/episode?id=one-piece-tv&ep=1
-app.get('/api/anime/episode', async(req,res)=>{
-  const animeId = (req.query.id||'').trim();
-  const ep      = parseInt(req.query.ep)||1;
-  if(!animeId) return res.status(400).json({error:'id required'});
-  if(!flvApi)  return res.status(503).json({error:'flv not available'});
+// ── Proxy Anify → evita CORS en browser ──
+// GET /api/anify/episodes/:anifyId
+app.get('/api/anify/episodes/:id', async (req, res) => {
   try {
-    // animeflv-api devuelve los servidores de video para el episodio
-    const videos = await flvApi.getEpisodeVideos(ep, animeId);
-    // videos es un array de arrays [[server1, server2, ...], [sub], [lat]]
-    // o un array plano de URLs/objetos
-    let servers = [];
-    if(Array.isArray(videos)){
-      // Puede ser array plano de strings (URLs) o array de objetos
-      const flat = videos.flat ? videos.flat(2) : videos;
-      servers = flat
-        .filter(v => v && (typeof v === 'string' || v.code || v.url))
-        .map(v => typeof v === 'string' ? {code:v,title:'Server'} : {code:v.code||v.url||'',title:v.title||v.server||'Server'});
-    }
-    res.json({animeId, ep, servers});
+    const data = await fetchJSON(`https://api.anify.tv/episodes/${req.params.id}`);
+    res.json(data);
   } catch(e) {
-    console.error('[/api/anime/episode]', e.message);
-    res.status(500).json({error:e.message});
+    res.status(500).json({ error: e.message });
   }
 });
 
-// ── AnimeFLV: últimos episodios (home anime) ──
-// GET /api/anime/latest
-app.get('/api/anime/latest', async(req,res)=>{
-  if(!flvApi) return res.status(503).json({error:'flv not available'});
+// GET /api/anify/sources?anifyId=xxx&episodeId=yyy&providerId=zzz&subType=dub
+app.get('/api/anify/sources', async (req, res) => {
+  const { anifyId, episodeId, providerId, subType = 'dub' } = req.query;
+  if (!anifyId || !episodeId || !providerId)
+    return res.status(400).json({ error: 'anifyId, episodeId, providerId required' });
   try {
-    const latest = await flvApi.getLatest();
-    const data = (latest||[]).map(a=>({
-      title:   a.title||'',
-      chapter: a.chapter||1,
-      cover:   a.cover||'',
-      url:     a.url||'',
-      id:      (a.url||'').replace('https://www3.animeflv.net/ver/','').replace(/-\d+$/,'')
-    }));
-    res.json({data});
+    // Anify sources endpoint
+    const url = `https://api.anify.tv/sources?animeId=${anifyId}&episodeId=${encodeURIComponent(episodeId)}&providerId=${encodeURIComponent(providerId)}&subType=${subType}&id=${anifyId}`;
+    const data = await fetchJSON(url);
+    res.json(data);
   } catch(e) {
-    res.status(500).json({error:e.message});
+    res.status(500).json({ error: e.message });
   }
 });
 
-// ── AnimeFLV: anime en emisión ──
-// GET /api/anime/onair
-app.get('/api/anime/onair', async(req,res)=>{
-  if(!flvApi) return res.status(503).json({error:'flv not available'});
+// GET /api/anify/search?q=naruto&type=anime
+app.get('/api/anify/search', async (req, res) => {
+  const { q, type = 'anime' } = req.query;
+  if (!q) return res.json([]);
   try {
-    const onair = await flvApi.getOnAir();
-    res.json({data: onair||[]});
+    const data = await fetchJSON(
+      `https://api.anify.tv/search/${type}/${encodeURIComponent(q)}?fields=[id,title,coverImage,currentEpisode,rating]`
+    );
+    res.json(data?.results || data || []);
   } catch(e) {
-    res.status(500).json({error:e.message});
+    res.status(500).json({ error: e.message });
   }
 });
 
-// ── SPA fallback ──
-app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
-app.listen(PORT,'0.0.0.0',()=>console.log(`✅ ShockTV :${PORT}`));
+// GET /api/anify/seasonal
+app.get('/api/anify/seasonal', async (req, res) => {
+  try {
+    const data = await fetchJSON(
+      'https://api.anify.tv/seasonal/anime?fields=[id,title,coverImage,bannerImage,currentEpisode,rating,status,year]'
+    );
+    res.json(data || {});
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/health', (req, res) => res.json({ status: 'ok', token: !!TMDB_TOKEN }));
+app.get('/api/token',  (req, res) => {
+  if (!TMDB_TOKEN) return res.status(500).json({ error: 'TMDB_TOKEN not set' });
+  res.json({ token: TMDB_TOKEN });
+});
+
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
+app.listen(PORT, '0.0.0.0', () => console.log(`✅ ShockTV :${PORT}`));
