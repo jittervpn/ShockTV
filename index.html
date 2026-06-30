@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
   <meta name="theme-color" content="#09090f"/>
   <title>ShockTV</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,78 +12,78 @@
 </head>
 <body>
 
-<!-- SIDEBAR OVERLAY -->
-<div class="sb-overlay" id="sb-overlay" onclick="closeSidebar()"></div>
-
 <!-- SIDEBAR -->
+<div class="sb-ov" id="sb-ov" onclick="closeSB()"></div>
 <aside class="sidebar" id="sidebar">
-  <div class="sb-head">
-    <div class="sb-logo">SHOCK<span>TV</span></div>
-    <button class="sb-x" onclick="closeSidebar()">✕</button>
+  <div class="sb-top">
+    <span class="sb-logo">SHOCK<em>TV</em></span>
+    <button class="sb-close" onclick="closeSB()">✕</button>
   </div>
   <nav class="sb-nav">
-    <div class="sb-sec">EXPLORAR</div>
-    <button class="sb-item active" id="sbi-home"     onclick="goHome();closeSidebar()">🏠 Inicio</button>
-    <button class="sb-item"        id="sbi-fav"      onclick="setSection('fav');closeSidebar()">❤️ Favoritos <span class="fav-count" id="fav-count"></span></button>
-    <button class="sb-item"        id="sbi-movies"   onclick="setSection('movies');closeSidebar()">🎬 Películas</button>
-    <button class="sb-item"        id="sbi-tv"       onclick="setSection('tv');closeSidebar()">📺 Series</button>
-    <button class="sb-item"        id="sbi-anime"    onclick="setSection('anime');closeSidebar()">⛩️ Anime</button>
-    <button class="sb-item"        id="sbi-toprated" onclick="setSection('toprated');closeSidebar()">⭐ Top Rated</button>
 
-    <div class="sb-sec">PELÍCULAS</div>
-    <div class="sb-grid">
-      <button onclick="setGenre('movie',28,'Acción');closeSidebar()">🥊 Acción</button>
-      <button onclick="setGenre('movie',35,'Comedia');closeSidebar()">😂 Comedia</button>
-      <button onclick="setGenre('movie',27,'Terror');closeSidebar()">👻 Terror</button>
-      <button onclick="setGenre('movie',878,'Sci-Fi');closeSidebar()">🚀 Sci-Fi</button>
-      <button onclick="setGenre('movie',53,'Thriller');closeSidebar()">🔪 Thriller</button>
-      <button onclick="setGenre('movie',18,'Drama');closeSidebar()">🎭 Drama</button>
-      <button onclick="setGenre('movie',10749,'Romance');closeSidebar()">❤️ Romance</button>
-      <button onclick="setGenre('movie',12,'Aventura');closeSidebar()">🗺️ Aventura</button>
-      <button onclick="setGenre('movie',80,'Crimen');closeSidebar()">🕵️ Crimen</button>
-      <button onclick="setGenre('movie',14,'Fantasía');closeSidebar()">🧙 Fantasía</button>
-      <button onclick="setGenre('movie',36,'Historia');closeSidebar()">📜 Historia</button>
-      <button onclick="setGenre('movie',99,'Documental');closeSidebar()">🎥 Doc</button>
+    <p class="sb-label">EXPLORAR</p>
+    <a class="sb-item active" id="sbi-home"     onclick="goHome();closeSB()">🏠 Inicio</a>
+    <a class="sb-item"        id="sbi-fav"       onclick="setSection('fav');closeSB()">❤️ Favoritos <b class="fav-badge" id="fav-count"></b></a>
+    <a class="sb-item"        id="sbi-movies"    onclick="setSection('movies');closeSB()">🎬 Películas</a>
+    <a class="sb-item"        id="sbi-tv"        onclick="setSection('tv');closeSB()">📺 Series</a>
+    <a class="sb-item"        id="sbi-anime"     onclick="setSection('anime');closeSB()">⛩️ Anime</a>
+    <a class="sb-item"        id="sbi-toprated"  onclick="setSection('toprated');closeSB()">⭐ Top Rated</a>
+
+    <p class="sb-label">PELÍCULAS</p>
+    <div class="sb-chips">
+      <button onclick="setGenre('movie',28,'Acción');closeSB()">🥊 Acción</button>
+      <button onclick="setGenre('movie',35,'Comedia');closeSB()">😂 Comedia</button>
+      <button onclick="setGenre('movie',27,'Terror');closeSB()">👻 Terror</button>
+      <button onclick="setGenre('movie',878,'Sci-Fi');closeSB()">🚀 Sci-Fi</button>
+      <button onclick="setGenre('movie',53,'Thriller');closeSB()">🔪 Thriller</button>
+      <button onclick="setGenre('movie',18,'Drama');closeSB()">🎭 Drama</button>
+      <button onclick="setGenre('movie',10749,'Romance');closeSB()">❤️ Romance</button>
+      <button onclick="setGenre('movie',12,'Aventura');closeSB()">🗺️ Aventura</button>
+      <button onclick="setGenre('movie',80,'Crimen');closeSB()">🕵️ Crimen</button>
+      <button onclick="setGenre('movie',14,'Fantasía');closeSB()">🧙 Fantasía</button>
+      <button onclick="setGenre('movie',36,'Historia');closeSB()">📜 Historia</button>
+      <button onclick="setGenre('movie',99,'Documental');closeSB()">🎥 Doc</button>
     </div>
 
-    <div class="sb-sec">SERIES</div>
-    <div class="sb-grid">
-      <button onclick="setGenre('tv',10765,'Fantasy');closeSidebar()">🧙 Fantasy</button>
-      <button onclick="setGenre('tv',18,'Drama');closeSidebar()">🎭 Drama</button>
-      <button onclick="setGenre('tv',35,'Comedia');closeSidebar()">😂 Comedia</button>
-      <button onclick="setGenre('tv',80,'Crimen');closeSidebar()">🕵️ Crimen</button>
-      <button onclick="setGenre('tv',10759,'Acción');closeSidebar()">⚔️ Acción</button>
-      <button onclick="setGenre('tv',9648,'Misterio');closeSidebar()">🔍 Misterio</button>
-      <button onclick="setGenre('tv',10762,'Familiar');closeSidebar()">👶 Familiar</button>
-      <button onclick="setGenre('tv',10768,'War');closeSidebar()">🏛️ War</button>
+    <p class="sb-label">SERIES</p>
+    <div class="sb-chips">
+      <button onclick="setGenre('tv',10765,'Fantasy');closeSB()">🧙 Fantasy</button>
+      <button onclick="setGenre('tv',18,'Drama');closeSB()">🎭 Drama</button>
+      <button onclick="setGenre('tv',35,'Comedia');closeSB()">😂 Comedia</button>
+      <button onclick="setGenre('tv',80,'Crimen');closeSB()">🕵️ Crimen</button>
+      <button onclick="setGenre('tv',10759,'Acción');closeSB()">⚔️ Acción</button>
+      <button onclick="setGenre('tv',9648,'Misterio');closeSB()">🔍 Misterio</button>
+      <button onclick="setGenre('tv',10762,'Familiar');closeSB()">👶 Familiar</button>
+      <button onclick="setGenre('tv',10768,'War');closeSB()">🏛️ War</button>
     </div>
 
-    <div class="sb-sec">ANIME</div>
-    <div class="sb-grid">
-      <button onclick="setAnimeGenre(1,'Acción');closeSidebar()">🥊 Acción</button>
-      <button onclick="setAnimeGenre(2,'Aventura');closeSidebar()">🗺️ Aventura</button>
-      <button onclick="setAnimeGenre(10,'Fantasía');closeSidebar()">🧙 Fantasía</button>
-      <button onclick="setAnimeGenre(24,'Sci-Fi');closeSidebar()">🤖 Sci-Fi</button>
-      <button onclick="setAnimeGenre(4,'Comedia');closeSidebar()">😂 Comedia</button>
-      <button onclick="setAnimeGenre(22,'Romance');closeSidebar()">❤️ Romance</button>
-      <button onclick="setAnimeGenre(7,'Sobrenatural');closeSidebar()">⚡ Misterio</button>
-      <button onclick="setAnimeGenre(8,'Drama');closeSidebar()">🎭 Drama</button>
-      <button onclick="setAnimeGenre(37,'Deporte');closeSidebar()">⚽ Deporte</button>
+    <p class="sb-label">ANIME</p>
+    <div class="sb-chips">
+      <button onclick="setAnimeGenre(1,'Acción');closeSB()">🥊 Acción</button>
+      <button onclick="setAnimeGenre(2,'Aventura');closeSB()">🗺️ Aventura</button>
+      <button onclick="setAnimeGenre(10,'Fantasía');closeSB()">🧙 Fantasía</button>
+      <button onclick="setAnimeGenre(24,'Sci-Fi');closeSB()">🤖 Sci-Fi</button>
+      <button onclick="setAnimeGenre(4,'Comedia');closeSB()">😂 Comedia</button>
+      <button onclick="setAnimeGenre(22,'Romance');closeSB()">❤️ Romance</button>
+      <button onclick="setAnimeGenre(8,'Drama');closeSB()">🎭 Drama</button>
+      <button onclick="setAnimeGenre(37,'Deporte');closeSB()">⚽ Deporte</button>
+      <button onclick="setAnimeGenre(7,'Misterio');closeSB()">🔍 Misterio</button>
     </div>
+
   </nav>
 </aside>
 
 <!-- NAVBAR -->
 <nav class="navbar" id="navbar">
   <div class="nav-inner">
-    <button class="hamburger" onclick="openSidebar()"><span></span><span></span><span></span></button>
+    <button class="nav-ham" onclick="openSB()"><span></span><span></span><span></span></button>
     <div class="nav-logo" onclick="goHome()">SHOCK<span>TV</span></div>
     <div class="nav-links">
-      <button class="nav-btn active" id="nb-home"   onclick="goHome()">Inicio</button>
-      <button class="nav-btn" id="nb-fav"           onclick="setSection('fav')">❤️ Favoritos</button>
-      <button class="nav-btn" id="nb-movies"        onclick="setSection('movies')">Películas</button>
-      <button class="nav-btn" id="nb-tv"            onclick="setSection('tv')">Series</button>
-      <button class="nav-btn" id="nb-anime"         onclick="setSection('anime')">Anime</button>
+      <button class="nav-btn active" id="nb-home"    onclick="goHome()">Inicio</button>
+      <button class="nav-btn"        id="nb-fav"     onclick="setSection('fav')">❤️ Favs</button>
+      <button class="nav-btn"        id="nb-movies"  onclick="setSection('movies')">Películas</button>
+      <button class="nav-btn"        id="nb-tv"      onclick="setSection('tv')">Series</button>
+      <button class="nav-btn"        id="nb-anime"   onclick="setSection('anime')">Anime</button>
     </div>
     <div class="nav-right">
       <div class="net-pill"><span class="net-dot" id="net-dot"></span><span id="net-txt">...</span></div>
@@ -93,114 +93,99 @@
       </div>
     </div>
   </div>
-  <!-- Search results dropdown -->
   <div class="search-dropdown hidden" id="search-dropdown"></div>
 </nav>
 
 <!-- HERO -->
 <section class="hero" id="hero-section">
   <div class="hero-bg" id="hero-bg"></div>
-  <div class="hero-overlay"></div>
+  <div class="hero-ov"></div>
   <div class="hero-content">
-    <div class="hero-badge">EN TENDENCIA</div>
+    <span class="hero-badge">EN TENDENCIA</span>
     <h1 class="hero-title" id="hero-title">Cargando...</h1>
     <p class="hero-desc" id="hero-desc"></p>
     <div class="hero-meta" id="hero-meta"></div>
     <div class="hero-btns">
       <button class="btn-play" id="hero-play"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Ver ahora</button>
-      <button class="btn-info" id="hero-info"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Más info</button>
+      <button class="btn-more" id="hero-info"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Más info</button>
     </div>
   </div>
 </section>
 
 <!-- MAIN -->
 <main class="main" id="main-content">
-  <div id="search-section"   class="hidden"><h2 class="sec-title page-t" id="search-title">Resultados</h2><div class="grid-cards" id="search-results"></div></div>
-  <div id="genre-section"    class="hidden"><h2 class="sec-title page-t" id="genre-title">Género</h2><div class="grid-cards" id="genre-grid"></div></div>
-  <div id="fav-section"      class="hidden"><h2 class="sec-title page-t">❤️ Mis Favoritos</h2><div class="grid-cards" id="fav-grid"></div></div>
-  <div id="movies-section"   class="hidden"><h2 class="sec-title page-t">🎬 Películas</h2><div class="grid-cards" id="movies-grid"></div></div>
-  <div id="tv-section"       class="hidden"><h2 class="sec-title page-t">📺 Series</h2><div class="grid-cards" id="tv-grid"></div></div>
-  <div id="anime-section"    class="hidden"><h2 class="sec-title page-t">⛩️ Anime</h2><div class="grid-cards" id="anime-grid"></div></div>
-  <div id="toprated-section" class="hidden"><h2 class="sec-title page-t">⭐ Top Rated</h2><div class="grid-cards" id="toprated-grid"></div></div>
+  <div id="search-section"   class="pg hidden"><h2 class="pg-title" id="search-title">Resultados</h2><div class="grid" id="search-results"></div></div>
+  <div id="genre-section"    class="pg hidden"><h2 class="pg-title" id="genre-title">Género</h2><div class="grid" id="genre-grid"></div></div>
+  <div id="fav-section"      class="pg hidden"><h2 class="pg-title">❤️ Favoritos</h2><div class="grid" id="fav-grid"></div></div>
+  <div id="movies-section"   class="pg hidden"><h2 class="pg-title">🎬 Películas</h2><div class="grid" id="movies-grid"></div></div>
+  <div id="tv-section"       class="pg hidden"><h2 class="pg-title">📺 Series</h2><div class="grid" id="tv-grid"></div></div>
+  <div id="anime-section"    class="pg hidden"><h2 class="pg-title">⛩️ Anime</h2><div class="grid" id="anime-grid"></div></div>
+  <div id="toprated-section" class="pg hidden"><h2 class="pg-title">⭐ Top Rated</h2><div class="grid" id="toprated-grid"></div></div>
 
   <div id="home-sections">
-    <section class="row-sec"><h2 class="sec-title">🔥 Tendencias</h2>
-      <div class="slider-wrap"><button class="sl-btn l" onclick="slide('s-trend',-1)">‹</button><div class="slider" id="s-trend"></div><button class="sl-btn r" onclick="slide('s-trend',1)">›</button></div>
+    <section class="row"><h2 class="row-title">🔥 Tendencias</h2>
+      <div class="sl-wrap"><button class="sl-btn l" onclick="slide('s0',-1)">‹</button><div class="sl" id="s0"></div><button class="sl-btn r" onclick="slide('s0',1)">›</button></div>
     </section>
-    <section class="row-sec"><h2 class="sec-title">🎬 Películas populares</h2>
-      <div class="slider-wrap"><button class="sl-btn l" onclick="slide('s-mov',-1)">‹</button><div class="slider" id="s-mov"></div><button class="sl-btn r" onclick="slide('s-mov',1)">›</button></div>
+    <section class="row"><h2 class="row-title">🎬 Películas populares</h2>
+      <div class="sl-wrap"><button class="sl-btn l" onclick="slide('s1',-1)">‹</button><div class="sl" id="s1"></div><button class="sl-btn r" onclick="slide('s1',1)">›</button></div>
     </section>
-    <section class="row-sec"><h2 class="sec-title">📺 Series populares</h2>
-      <div class="slider-wrap"><button class="sl-btn l" onclick="slide('s-tv',-1)">‹</button><div class="slider" id="s-tv"></div><button class="sl-btn r" onclick="slide('s-tv',1)">›</button></div>
+    <section class="row"><h2 class="row-title">📺 Series populares</h2>
+      <div class="sl-wrap"><button class="sl-btn l" onclick="slide('s2',-1)">‹</button><div class="sl" id="s2"></div><button class="sl-btn r" onclick="slide('s2',1)">›</button></div>
     </section>
-    <section class="row-sec"><h2 class="sec-title">⛩️ Anime en tendencia</h2>
-      <div class="slider-wrap"><button class="sl-btn l" onclick="slide('s-anime',-1)">‹</button><div class="slider" id="s-anime"></div><button class="sl-btn r" onclick="slide('s-anime',1)">›</button></div>
+    <section class="row"><h2 class="row-title">⛩️ Anime en tendencia</h2>
+      <div class="sl-wrap"><button class="sl-btn l" onclick="slide('s3',-1)">‹</button><div class="sl" id="s3"></div><button class="sl-btn r" onclick="slide('s3',1)">›</button></div>
     </section>
-    <section class="row-sec"><h2 class="sec-title">⛩️ Anime esta temporada</h2>
-      <div class="slider-wrap"><button class="sl-btn l" onclick="slide('s-anime2',-1)">‹</button><div class="slider" id="s-anime2"></div><button class="sl-btn r" onclick="slide('s-anime2',1)">›</button></div>
+    <section class="row"><h2 class="row-title">⛩️ Anime esta temporada</h2>
+      <div class="sl-wrap"><button class="sl-btn l" onclick="slide('s4',-1)">‹</button><div class="sl" id="s4"></div><button class="sl-btn r" onclick="slide('s4',1)">›</button></div>
     </section>
   </div>
 </main>
 
-<!-- ═══ PLAYER MODAL ═══ -->
-<div class="ply-overlay hidden" id="ply-overlay">
+<!-- PLAYER -->
+<div class="ply-ov hidden" id="ply-ov">
   <div class="ply-box">
-    <!-- Top bar -->
-    <div class="ply-top">
-      <div class="ply-left">
-        <button class="ply-back" onclick="closePlayer()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg></button>
-        <div class="ply-title-wrap">
-          <div class="ply-ttl" id="ply-ttl">Reproduciendo...</div>
-          <div class="ply-ep"  id="ply-ep"></div>
-        </div>
+    <div class="ply-bar">
+      <div class="ply-bar-l">
+        <button class="ply-back" onclick="closePly()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <div><div class="ply-title" id="ply-title">Reproduciendo...</div><div class="ply-epbadge" id="ply-epbadge"></div></div>
       </div>
-      <div class="ply-top-right">
-        <!-- Idioma / Fuente -->
+      <div class="ply-bar-r">
         <div class="lang-pills" id="lang-pills"></div>
-        <button class="ply-close" onclick="closePlayer()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+        <button class="ply-x" onclick="closePly()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
     </div>
-
-    <!-- Frame -->
-    <div class="ply-frame-wrap">
-      <iframe id="ply-frame" allowfullscreen allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation allow-pointer-lock"></iframe>
-    </div>
-
-    <!-- Panel de episodios — lista vertical con miniatura y barra de progreso -->
+    <div class="ply-frame-w"><iframe id="ply-frame" allowfullscreen allow="autoplay;encrypted-media;fullscreen;picture-in-picture" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation allow-pointer-lock"></iframe></div>
     <div class="ep-panel hidden" id="ep-panel">
-      <div class="ep-panel-head">
-        <span class="ep-panel-title">Episodios</span>
-        <div class="ep-season-tabs" id="ep-season-tabs"></div>
-        <div class="ep-progress-info" id="ep-progress-info"></div>
+      <div class="ep-head">
+        <span class="ep-title">Episodios</span>
+        <div class="ep-stabs" id="ep-stabs"></div>
+        <span class="ep-prog" id="ep-prog"></span>
       </div>
-      <div class="ep-list" id="ep-grid"></div>
+      <div class="ep-list" id="ep-list"></div>
     </div>
   </div>
 </div>
 
-<!-- ═══ DETAIL MODAL ═══ -->
-<div class="modal-ov hidden" id="modal-ov" onclick="closeModal(event)">
-  <div class="modal" id="modal">
-    <button class="modal-x" onclick="closeModal()">✕</button>
-    <div class="modal-back" id="modal-back"></div>
-    <div class="modal-body">
-      <div class="modal-poster-w"><img class="modal-poster" id="modal-poster" src="" alt=""/></div>
-      <div class="modal-info">
-        <div class="modal-tags"  id="modal-tags"></div>
-        <h2 class="modal-title"  id="modal-title"></h2>
-        <div class="modal-meta"  id="modal-meta"></div>
-        <p class="modal-ov-txt"  id="modal-ov-txt"></p>
-        <div id="modal-actions"></div>
-        <div class="modal-cast"  id="modal-cast"></div>
+<!-- DETAIL MODAL -->
+<div class="mod-ov hidden" id="mod-ov" onclick="closeMod(event)">
+  <div class="mod" id="mod">
+    <button class="mod-x" onclick="closeMod()">✕</button>
+    <div class="mod-back" id="mod-back"></div>
+    <div class="mod-body">
+      <img class="mod-poster" id="mod-poster" src="" alt=""/>
+      <div class="mod-info">
+        <div class="mod-tags" id="mod-tags"></div>
+        <h2 class="mod-title" id="mod-title"></h2>
+        <div class="mod-meta" id="mod-meta"></div>
+        <p class="mod-syn" id="mod-syn"></p>
+        <div class="mod-acts" id="mod-acts"></div>
+        <div class="mod-cast" id="mod-cast"></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- LOADING -->
+<!-- LOADER -->
 <div class="loader-ov hidden" id="loader-ov">
   <div class="loader-box"><div class="loader-logo">SHOCK<span>TV</span></div><div class="loader-bar"><div class="loader-fill"></div></div></div>
 </div>
@@ -208,7 +193,7 @@
 <!-- TOAST -->
 <div class="toast hidden" id="toast"></div>
 
-<footer class="footer"><p>© 2025 ShockTV · <a href="https://themoviedb.org" target="_blank">TMDB</a> · AniList · Jikan · Unlimplay</p></footer>
+<footer class="footer"><p>© 2025 ShockTV · <a href="https://themoviedb.org" target="_blank">TMDB</a> · Jikan · VidPlus</p></footer>
 
 <script src="config.js"></script>
 <script src="app.js"></script>
