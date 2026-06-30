@@ -1,39 +1,32 @@
-// ═══════════════════════════════════════════════
-//  ShockTV — app.js (v5 — AnimeFLV + multi-fuente)
-// ═══════════════════════════════════════════════
-const IMG5  = 'https://image.tmdb.org/t/p/w500';
-const IMG7  = 'https://image.tmdb.org/t/p/w780';
-const IMGO  = 'https://image.tmdb.org/t/p/original';
-const TMDB  = 'https://api.themoviedb.org/3';
-const JIKAN = 'https://api.jikan.moe/v4';
+// ═══════════════════════════════════════
+//  ShockTV — app.js FINAL
+//  Anime: TMDB (español) + VidSrc streaming
+// ═══════════════════════════════════════
+const IMG5 = 'https://image.tmdb.org/t/p/w500';
+const IMG7 = 'https://image.tmdb.org/t/p/w780';
+const IMGO = 'https://image.tmdb.org/t/p/original';
+const TMDB = 'https://api.themoviedb.org/3';
 
-// ── FUENTES DE STREAMING ──
-// Para anime: intentamos en orden hasta que una funcione
-// 1. AnimeFLV (a través del scraper en Railway) — español latino garantizado
-// 2. VidSrc.me — alternativa por MAL ID
-// 3. 2embed — último fallback
+// ── STREAMING ──
+// Películas / Series / Anime → VidSrc (funciona sin registro, amplio catálogo)
+// Para anime usa TMDB ID de la serie
+const SRC_MOV   = id        => `https://vidsrc.me/embed/movie/${id}`;
+const SRC_TV    = (id,s,e)  => `https://vidsrc.me/embed/tv/${id}/${s}/${e}`;
+// Anime por TMDB ID de la serie (muchos animes están en TMDB como series)
+// Con fallback a vidsrc2 y 2embed
+const SRC_ANIME = [
+  (id,ep) => `https://vidsrc.me/embed/tv/${id}/1/${ep}`,
+  (id,ep) => `https://vidsrc.to/embed/tv/${id}/1/${ep}`,
+  (id,ep) => `https://www.2embed.stream/embed/tv/${id}/1/${ep}`,
+  (id,ep) => `https://multiembed.mov/?video_id=${id}&tmdb=1&s=1&e=${ep}`,
+];
 
-const SRC_MOVIE  = id        => `https://vidsrc.me/embed/movie/${id}`;
-const SRC_TV     = (id,s,e)  => `https://vidsrc.me/embed/tv/${id}/${s}/${e}`;
-
-// Anime — múltiples fuentes en cascada
-function getAnimeSrcs(malId, ep){
-  return [
-    // VidSrc — mejor cobertura, sin registro de dominio
-    `https://vidsrc.me/embed/anime/${malId}/${ep}`,
-    // 2Embed — buen fallback
-    `https://www.2embed.stream/embed/anilist/${malId}/${ep}`,
-    // Anime4you embed por MAL
-    `https://www.animeowl.me/embed/?malid=${malId}&ep=${ep}`,
-  ];
-}
-
-// ── Cache ──
-const CACHE=new Map();
+// Cache
+const C = new Map();
 async function cached(k,fn,ttl=300000){
-  const h=CACHE.get(k);
+  const h=C.get(k);
   if(h&&Date.now()-h.t<ttl)return h.v;
-  const v=await fn();CACHE.set(k,{v,t:Date.now()});return v;
+  const v=await fn();C.set(k,{v,t:Date.now()});return v;
 }
 
 let TOKEN='';
@@ -44,28 +37,19 @@ async function tmdb(p){return cached('t:'+p,async()=>{
   if(!r.ok||d.success===false)throw new Error(d.status_message||'TMDB '+r.status);
   return d;
 });}
-async function jikan(p,att=0){return cached('j:'+p,async()=>{
-  const r=await fetch(JIKAN+p,{headers:{accept:'application/json'}});
-  if(r.status===429&&att<2){await sleep(1300);return jikan(p,att+1);}
-  if(!r.ok)throw new Error('Jikan '+r.status);
-  return r.json();
-});}
 
-// API AnimeFLV vía servidor Railway
-async function flvSearch(q){
-  try{const r=await fetch('/api/flv/search?q='+encodeURIComponent(q));if(r.ok)return r.json();}catch(e){}
-  return [];
-}
-async function flvEmbed(id,ep){
-  try{const r=await fetch(`/api/flv/embed?id=${id}&ep=${ep}`);if(r.ok)return r.json();}catch(e){}
-  return null;
+// Buscar anime en TMDB con language=es-ES para obtener todo en español
+async function tmdbAnimeSearch(query){
+  return cached('tas:'+query,async()=>{
+    const r=await fetch(`${TMDB}/search/tv?query=${encodeURIComponent(query)}&language=es-ES&with_keywords=210024`,{headers:tmdbH()});
+    return r.json();
+  });
 }
 
-// ── Estado ──
+// Estado
 let heroItems=[],heroIdx=0,heroTimer=null;
-let pl={type:'',tmdbId:0,malId:null,flvId:null,s:1,ep:1,seasons:[],eps:[],thumbs:{},
-        title:'',poster:'',isAnime:false,lang:'lat',total:0,
-        srcIdx:0,srcList:[],flvServers:[]};
+let pl={type:'',tmdbId:0,animeId:null,s:1,ep:1,seasons:[],eps:[],thumbs:{},
+        title:'',poster:'',isAnime:false,lang:'es',total:0,srcIdx:0};
 let favs={},prog={};
 
 const $    =id=>document.getElementById(id);
@@ -77,9 +61,9 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let toastT;
 function toast(m,d=2400){const t=$('toast');if(!t)return;t.textContent=m;show('toast');clearTimeout(toastT);toastT=setTimeout(()=>hide('toast'),d);}
 
-// ══════════════════════════════════════
+// ═══════════════════════════════
 //  INIT
-// ══════════════════════════════════════
+// ═══════════════════════════════
 document.addEventListener('DOMContentLoaded',async()=>{
   show('loader-ov');
   window.addEventListener('scroll',()=>$('navbar').classList.toggle('scrolled',window.scrollY>55));
@@ -88,7 +72,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   detectNet();
   await loadToken();
   if(!TOKEN){
-    $('main-content').innerHTML='<div style="color:var(--red);padding:32px;text-align:center">⚠️ Token TMDB no encontrado — configura <strong>config.js</strong></div>';
+    $('main-content').innerHTML='<div style="color:var(--red);padding:32px;text-align:center">⚠️ Falta el token TMDB en config.js</div>';
     hide('loader-ov');return;
   }
   await loadHome();
@@ -101,9 +85,9 @@ async function loadToken(){
   if(window.TMDB_TOKEN)TOKEN=window.TMDB_TOKEN;
 }
 
-// ══════════════════════════════════════
+// ═══════════════════════════════
 //  RED
-// ══════════════════════════════════════
+// ═══════════════════════════════
 async function detectNet(){
   const dot=$('net-dot'),txt=$('net-txt');if(!dot||!txt)return;
   const nav=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
@@ -129,9 +113,9 @@ async function detectNet(){
   setTimeout(detectNet,30000);
 }
 
-// ══════════════════════════════════════
+// ═══════════════════════════════
 //  STORE
-// ══════════════════════════════════════
+// ═══════════════════════════════
 function loadStore(){
   try{favs=JSON.parse(localStorage.getItem('stv_favs')||'{}');}catch(e){favs={};}
   try{prog=JSON.parse(localStorage.getItem('stv_prog')||'{}');}catch(e){prog={};}
@@ -149,13 +133,14 @@ function toggleFav(t,id,title,poster,rating){
   if(favs[k]){delete favs[k];toast('Eliminado de favoritos');}
   else{favs[k]={id,type:t,title,poster,rating};toast('❤️ Añadido a favoritos');}
   saveStore();
-  const fb=$('fav-btn-mod');if(fb){fb.classList.toggle('on',isFav(t,id));fb.textContent=isFav(t,id)?'❤️ En favoritos':'🤍 Favoritos';}
+  const fb=$('fav-btn-mod');
+  if(fb){fb.classList.toggle('on',isFav(t,id));fb.textContent=isFav(t,id)?'❤️ En favoritos':'🤍 Favoritos';}
   document.querySelectorAll(`.fav-heart[data-k="${k}"]`).forEach(h=>{h.classList.toggle('on',!!favs[k]);h.textContent=favs[k]?'❤️':'🤍';});
 }
 function renderFavs(){
   const el=$('fav-grid');if(!el)return;
   const items=Object.values(favs);
-  if(!items.length){el.innerHTML='<p style="color:var(--muted);padding:24px;grid-column:1/-1">No tenés favoritos aún.</p>';return;}
+  if(!items.length){el.innerHTML='<p style="color:var(--muted);padding:24px;grid-column:1/-1">No tenés favoritos aún. Tocá 🤍 en cualquier póster.</p>';return;}
   el.innerHTML=items.map(i=>mkCard(i,i.type)).join('');
 }
 const epk=(t,id,s,ep)=>`${t}-${id}-s${s}e${ep}`;
@@ -171,9 +156,9 @@ function markWatched(t,id,s,ep,v=true){
   saveStore();renderEpList();
 }
 
-// ══════════════════════════════════════
+// ═══════════════════════════════
 //  SIDEBAR / NAV
-// ══════════════════════════════════════
+// ═══════════════════════════════
 function openSB(){$('sidebar').classList.add('open');$('sb-ov').classList.add('open');document.body.style.overflow='hidden';}
 function closeSB(){$('sidebar').classList.remove('open');$('sb-ov').classList.remove('open');document.body.style.overflow='';}
 const NM={home:'nb-home',fav:'nb-fav',movies:'nb-movies',tv:'nb-tv',anime:'nb-anime'};
@@ -185,9 +170,9 @@ function setNav(sec){
   if(SM[sec])$(SM[sec])?.classList.add('active');
 }
 
-// ══════════════════════════════════════
+// ═══════════════════════════════
 //  BÚSQUEDA
-// ══════════════════════════════════════
+// ═══════════════════════════════
 let sdT;
 function setupSearch(){
   const inp=$('search-input');
@@ -204,55 +189,47 @@ function setupSearch(){
     if(!e.target.closest('.nav-search')&&!e.target.closest('.search-dropdown'))hide('search-dropdown');
   });
 }
+
 async function liveSearch(q){
   const dd=$('search-dropdown');
-  dd.innerHTML=`<div class="sd-no-results">${spinI()}&nbsp;Buscando...</div>`;
+  dd.innerHTML=`<div class="sd-no-results">${spinI()}Buscando...</div>`;
   show('search-dropdown');
   try{
-    const[tr,jr]=await Promise.allSettled([
-      tmdb('/search/multi?query='+encodeURIComponent(q)+'&language=es-ES&page=1'),
-      jikan('/anime?q='+encodeURIComponent(q)+'&limit=4&sfw=true'),
-    ]);
-    const rows=[];
-    (tr.status==='fulfilled'?tr.value.results||[]:[]).filter(i=>i.media_type!=='person').slice(0,5).forEach(i=>rows.push({
-      title:i.title||i.name,year:(i.release_date||i.first_air_date||'').slice(0,4),
-      img:i.poster_path?IMG5+i.poster_path:'',tag:i.media_type==='movie'?'Película':'Serie',
-      fn:`hide('search-dropdown');openDetail('${i.media_type||"movie"}',${i.id})`
-    }));
-    (jr.status==='fulfilled'?jr.value.data||[]:[]).forEach(i=>rows.push({
-      title:i.title_spanish||i.title_english||i.title,year:i.year||'',
-      img:i.images?.jpg?.image_url||'',tag:'Anime',
-      fn:`hide('search-dropdown');openAnimeDetail(${i.mal_id},'${esc((i.title_spanish||i.title_english||i.title||'').replace(/'/g,"\\'"))}')`
-    }));
-    if(!rows.length){dd.innerHTML=`<div class="sd-no-results">Sin resultados</div>`;return;}
-    dd.innerHTML=rows.map(r=>`
-      <div class="sd-item" onclick="${r.fn}">
-        ${r.img?`<img class="sd-img" src="${r.img}" alt="" loading="lazy" onerror="this.style.display='none'">`:'<div class="sd-img"></div>'}
-        <div class="sd-info"><div class="sd-title">${esc(r.title||'')}</div><div class="sd-meta">${r.year}</div></div>
-        <span class="sd-tag">${r.tag}</span>
-      </div>`).join('');
+    // TMDB busca todo en español: películas, series Y anime
+    const r=await tmdb('/search/multi?query='+encodeURIComponent(q)+'&language=es-ES&page=1');
+    const items=(r.results||[]).filter(i=>i.media_type!=='person').slice(0,9);
+    if(!items.length){dd.innerHTML=`<div class="sd-no-results">Sin resultados</div>`;return;}
+    dd.innerHTML=items.map(i=>{
+      const title=i.title||i.name||'';
+      const year=(i.release_date||i.first_air_date||'').slice(0,4);
+      const poster=i.poster_path?IMG5+i.poster_path:'';
+      const tag=i.media_type==='movie'?'Película':'Serie';
+      return`<div class="sd-item" onclick="hide('search-dropdown');openDetail('${i.media_type||"tv"}',${i.id})">
+        ${poster?`<img class="sd-img" src="${poster}" alt="" loading="lazy" onerror="this.style.display='none'">`:'<div class="sd-img"></div>'}
+        <div class="sd-info"><div class="sd-title">${esc(title)}</div><div class="sd-meta">${year}</div></div>
+        <span class="sd-tag">${tag}</span>
+      </div>`;
+    }).join('');
   }catch(e){dd.innerHTML=`<div class="sd-no-results">Error al buscar</div>`;}
 }
+
 function doSearch(){
   const q=$('search-input').value.trim();if(!q)return;
   hideAll();show('search-section');$('search-title').textContent=`Resultados: "${q}"`;
   $('search-results').innerHTML=spinB();
-  Promise.allSettled([
-    tmdb('/search/multi?query='+encodeURIComponent(q)+'&language=es-ES'),
-    jikan('/anime?q='+encodeURIComponent(q)+'&limit=10&sfw=true'),
-  ]).then(([t,j])=>{
-    const ti=t.status==='fulfilled'?(t.value.results||[]).filter(i=>i.media_type!=='person').map(i=>mkCard(i,i.media_type||'movie')):[];
-    const ji=j.status==='fulfilled'?(j.value.data||[]).map(i=>mkJCard(i)):[];
-    $('search-results').innerHTML=[...ti,...ji].join('')||nores();
-  });
+  tmdb('/search/multi?query='+encodeURIComponent(q)+'&language=es-ES').then(d=>{
+    const items=(d.results||[]).filter(i=>i.media_type!=='person');
+    $('search-results').innerHTML=items.map(i=>mkCard(i,i.media_type||'tv')).join('')||nores();
+  }).catch(e=>$('search-results').innerHTML=errB(e));
 }
 
-// ══════════════════════════════════════
+// ═══════════════════════════════
 //  SECCIONES
-// ══════════════════════════════════════
+// ═══════════════════════════════
 const SECS=['home-sections','movies-section','tv-section','anime-section','toprated-section','search-section','genre-section','fav-section'];
 function hideAll(){SECS.forEach(hide);$('hero-section').style.display='none';}
 function goHome(){SECS.forEach(hide);show('home-sections');$('hero-section').style.display='';setNav('home');closeSB();window.scrollTo({top:0,behavior:'smooth'});}
+
 function setSection(sec){
   hideAll();setNav(sec);closeSB();window.scrollTo({top:0,behavior:'smooth'});
   ({fav:()=>{show('fav-section');renderFavs();},
@@ -262,6 +239,7 @@ function setSection(sec){
     toprated:()=>{show('toprated-section');loadTopRated();},
   })[sec]?.();
 }
+
 async function setGenre(type,gid,label){
   hideAll();show('genre-section');$('genre-title').textContent=(type==='movie'?'🎬 ':'📺 ')+label;
   $('genre-grid').innerHTML=spinB();closeSB();window.scrollTo({top:0,behavior:'smooth'});
@@ -269,47 +247,48 @@ async function setGenre(type,gid,label){
     $('genre-grid').innerHTML=(d.results||[]).map(i=>mkCard(i,type)).join('')||nores();}
   catch(e){$('genre-grid').innerHTML=errB(e);}
 }
-async function setAnimeGenre(mgid,label){
+
+// Anime por género usando TMDB (keyword anime = 210024)
+async function setAnimeGenre(gid,label){
   hideAll();show('genre-section');$('genre-title').textContent='⛩️ Anime · '+label;
   $('genre-grid').innerHTML=spinB();closeSB();window.scrollTo({top:0,behavior:'smooth'});
-  try{const d=await jikan(`/anime?genres=${mgid}&order_by=popularity&sort=asc&limit=24&sfw=true`);
-    $('genre-grid').innerHTML=(d.data||[]).map(i=>mkJCard(i)).join('')||nores();}
-  catch(e){$('genre-grid').innerHTML=errB(e);}
+  try{
+    const d=await tmdb(`/discover/tv?language=es-ES&with_keywords=210024&with_genres=${gid}&sort_by=popularity.desc`);
+    $('genre-grid').innerHTML=(d.results||[]).map(i=>mkCard(i,'tv',true)).join('')||nores();
+  }catch(e){$('genre-grid').innerHTML=errB(e);}
 }
 
-// ══════════════════════════════════════
+// ═══════════════════════════════
 //  HOME
-// ══════════════════════════════════════
+// ═══════════════════════════════
 async function loadHome(){
   try{
-    const[tm,ttv,mp,tvp]=await Promise.all([
+    const[tm,ttv,mp,tvp,anime]=await Promise.all([
       tmdb('/trending/movie/week?language=es-ES'),
       tmdb('/trending/tv/week?language=es-ES'),
       tmdb('/movie/popular?language=es-ES'),
       tmdb('/tv/popular?language=es-ES'),
+      // Anime trending desde TMDB — TODO EN ESPAÑOL
+      tmdb('/discover/tv?language=es-ES&with_keywords=210024&sort_by=popularity.desc&page=1'),
     ]);
     heroItems=(tm.results||[]).filter(m=>m.backdrop_path).slice(0,8);
     if(heroItems.length){renderHero(heroItems[0],'movie');startHero();}
     renderSl('s0',[...(tm.results||[]).slice(0,10),...(ttv.results||[]).slice(0,10)],true);
     renderSl('s1',mp.results||[]);
     renderSl('s2',ttv.results||[],false,true);
-  }catch(e){console.error('TMDB:',e);}
-  loadAnimeRows();
-}
-async function loadAnimeRows(){
-  const[r1,r2]=await Promise.allSettled([
-    jikan('/top/anime?filter=airing&limit=20'),
-    sleep(400).then(()=>jikan('/seasons/now?limit=20')),
-  ]);
-  if(r1.status==='fulfilled'&&r1.value.data?.length)renderSl('s3',r1.value.data,false,false,true);
-  else{const a=$('s3');if(a)a.innerHTML=noDisp();}
-  if(r2.status==='fulfilled'&&r2.value.data?.length)renderSl('s4',r2.value.data,false,false,true);
-  else{const b=$('s4');if(b)b.innerHTML=noDisp();}
+    renderSl('s3',anime.results||[],false,false,true);
+  }catch(e){console.error('loadHome',e);}
+
+  // Segunda fila anime: esta temporada
+  try{
+    const now=new Date();const year=now.getFullYear();
+    const m=now.getMonth();const seasons=['winter','spring','summer','fall'];
+    const season=seasons[Math.floor(m/3)];
+    const d=await tmdb(`/discover/tv?language=es-ES&with_keywords=210024&first_air_date_year=${year}&sort_by=popularity.desc`);
+    if(d.results?.length)renderSl('s4',d.results,false,false,true);
+  }catch(e){const b=$('s4');if(b)b.innerHTML=noDisp();}
 }
 
-// ══════════════════════════════════════
-//  HERO
-// ══════════════════════════════════════
 function renderHero(item,type){
   $('hero-bg').style.backgroundImage=item.backdrop_path?`url(${IMGO+item.backdrop_path})`:'';
   $('hero-title').textContent=item.title||item.name||'';
@@ -324,47 +303,55 @@ function startHero(){
   heroTimer=setInterval(()=>{heroIdx=(heroIdx+1)%heroItems.length;renderHero(heroItems[heroIdx],'movie');},7500);
 }
 
-// ══════════════════════════════════════
+// ═══════════════════════════════
 //  SLIDERS / GRIDS
-// ══════════════════════════════════════
+// ═══════════════════════════════
 function renderSl(id,items,mixed=false,isTV=false,isAnime=false){
   const c=$(id);if(!c)return;
-  c.innerHTML=(items||[]).map(i=>isAnime?mkJCard(i):mkCard(i,mixed?(i.media_type||'movie'):(isTV?'tv':'movie'))).join('');
+  c.innerHTML=(items||[]).map(i=>mkCard(i,mixed?(i.media_type||'movie'):(isTV?'tv':'movie'),isAnime)).join('');
 }
 function slide(id,dir){const s=$(id);if(s)s.scrollBy({left:dir*150*3,behavior:'smooth'});}
+
 async function loadGrid(gid,type){
   const el=$(gid);if(!el||el.dataset.loaded)return;el.dataset.loaded=1;el.innerHTML=spinB();
   try{const d=await tmdb(type==='movie'?'/movie/popular?language=es-ES':'/tv/popular?language=es-ES');
     el.innerHTML=(d.results||[]).map(i=>mkCard(i,type)).join('');}
   catch(e){el.innerHTML=errB(e);}
 }
+
 async function loadAnimeGrid(){
   const el=$('anime-grid');if(!el||el.dataset.loaded)return;el.dataset.loaded=1;el.innerHTML=spinB();
   try{
-    const[t,s]=await Promise.all([jikan('/top/anime?filter=airing&limit=20'),jikan('/seasons/now?limit=20')]);
-    const seen=new Set();
-    const u=[...(t.data||[]),...(s.data||[])].filter(a=>{if(seen.has(a.mal_id))return false;seen.add(a.mal_id);return true;});
-    el.innerHTML=u.slice(0,40).map(i=>mkJCard(i)).join('');
+    // TMDB anime grid — todo en español
+    const[p1,p2]=await Promise.all([
+      tmdb('/discover/tv?language=es-ES&with_keywords=210024&sort_by=popularity.desc&page=1'),
+      tmdb('/discover/tv?language=es-ES&with_keywords=210024&sort_by=popularity.desc&page=2'),
+    ]);
+    const all=[...(p1.results||[]),...(p2.results||[])];
+    el.innerHTML=all.map(i=>mkCard(i,'tv',true)).join('');
   }catch(e){el.innerHTML=errB(e);}
 }
+
 async function loadTopRated(){
   const el=$('toprated-grid');if(!el||el.dataset.loaded)return;el.dataset.loaded=1;el.innerHTML=spinB();
-  try{const d=await tmdb('/movie/top_rated?language=es-ES');el.innerHTML=(d.results||[]).map(i=>mkCard(i,'movie')).join('');}
+  try{const d=await tmdb('/movie/top_rated?language=es-ES');
+    el.innerHTML=(d.results||[]).map(i=>mkCard(i,'movie')).join('');}
   catch(e){el.innerHTML=errB(e);}
 }
 
-// ══════════════════════════════════════
-//  CARDS
-// ══════════════════════════════════════
+// ═══════════════════════════════
+//  CARDS — 100% TMDB, todo en español
+// ═══════════════════════════════
 function mkCard(item,type,isAnime=false){
   const title=esc(item.title||item.name||'Sin título');
-  const rat=item.vote_average?.toFixed(1)||'?';
+  const rat=(item.vote_average||0).toFixed(1);
   const tag=isAnime?'Anime':(type==='movie'?'Film':'TV');
   const k=fk(type,item.id);
   const poster=item.poster_path?IMG5+item.poster_path:'';
   const ov=esc((item.overview||'').substring(0,280));
   const img=poster?`<img src="${poster}" alt="${title}" loading="lazy" onerror="this.className='card-ph'">`:`<div class="card-ph"></div>`;
-  const fn=`openMini('${type}',${item.id},'${title.replace(/'/g,"\\'")}','${poster}','${rat}','${ov.replace(/'/g,"\\'")}',${isAnime},null)`;
+  // Al tocar → mini modal con opción de Ver / Sinopsis
+  const fn=`openMini('${type}',${item.id},'${title.replace(/'/g,"\\'")}','${poster}','${rat}','${ov.replace(/'/g,"\\'")}',${isAnime})`;
   return`<div class="card" onclick="${fn}">${img}
     <span class="card-tag${isAnime?' anime-tag':''}">${tag}</span>
     <button class="fav-heart${isFav(type,item.id)?' on':''}" data-k="${k}"
@@ -373,35 +360,18 @@ function mkCard(item,type,isAnime=false){
     <div class="card-ov"><div class="card-name">${title}</div><div class="card-rat">★ ${rat}</div></div>
   </div>`;
 }
-function mkJCard(item){
-  const title=esc(item.title_spanish||item.title_english||item.title||'Sin título');
-  const rat=item.score?item.score.toFixed(1):'?';
-  const malId=item.mal_id;
-  const poster=item.images?.jpg?.large_image_url||item.images?.jpg?.image_url||'';
-  const ov=esc((item.synopsis||'').replace(/\[Written.*?\]/g,'').replace(/\(Source:.*?\)/g,'').trim().substring(0,280));
-  const img=poster?`<img src="${poster}" alt="${title}" loading="lazy" onerror="this.className='card-ph'">`:`<div class="card-ph"></div>`;
-  const fn=`openMini('anime',${malId},'${title.replace(/'/g,"\\'")}','${poster}','${rat}','${ov.replace(/'/g,"\\'")}',true,${malId})`;
-  return`<div class="card" onclick="${fn}">${img}
-    <span class="card-tag anime-tag">Anime</span>
-    <div class="card-ov"><div class="card-name">${title}</div><div class="card-rat">★ ${rat}</div></div>
-  </div>`;
-}
 
-// ══════════════════════════════════════
+// ═══════════════════════════════
 //  MINI MODAL
-// ══════════════════════════════════════
-function openMini(type,id,title,poster,rating,overview,isAnime,malId){
+// ═══════════════════════════════
+function openMini(type,id,title,poster,rating,overview,isAnime){
   const ex=$('mini-ov');if(ex)ex.remove();
   const ov=document.createElement('div');ov.id='mini-ov';
   ov.style.cssText='position:fixed;inset:0;z-index:450;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.76);backdrop-filter:blur(4px);animation:fadein .17s';
   ov.onclick=e=>{if(e.target===ov)ov.remove();};
   const st=title.replace(/'/g,"\\'");
-  const wFn=isAnime&&malId
-    ?`document.getElementById('mini-ov').remove();openAnimePlayer(${malId},'${st}',100)`
-    :`document.getElementById('mini-ov').remove();openPlayer('${type}',${id},'${st}')`;
-  const iFn=isAnime&&malId
-    ?`document.getElementById('mini-ov').remove();openAnimeDetail(${malId},'${st}')`
-    :`document.getElementById('mini-ov').remove();openDetail('${type}',${id},${!!isAnime})`;
+  const wFn=`document.getElementById('mini-ov').remove();openPlayer('${type}',${id},'${st}',${isAnime})`;
+  const iFn=`document.getElementById('mini-ov').remove();openDetail('${type}',${id},${isAnime})`;
   ov.innerHTML=`
     <div style="background:var(--s1);border-radius:13px;max-width:350px;width:100%;overflow:hidden;border:1px solid rgba(255,255,255,.09);box-shadow:0 22px 60px rgba(0,0,0,.88)">
       <div style="position:relative;${poster?`background:url('${poster}') center/cover;`:''} min-height:185px">
@@ -427,69 +397,46 @@ function openMini(type,id,title,poster,rating,overview,isAnime,malId){
   document.body.appendChild(ov);
 }
 
-// ══════════════════════════════════════
-//  DETAIL — TMDB (películas/series)
-// ══════════════════════════════════════
+// ═══════════════════════════════
+//  DETAIL MODAL — TODO en español via TMDB
+// ═══════════════════════════════
 async function openDetail(type,id,isAnime=false){
   show('loader-ov');
   try{
-    const[det,cred]=await Promise.all([tmdb(`/${type}/${id}?language=es-ES`),tmdb(`/${type}/${id}/credits?language=es-ES`)]);
+    const[det,cred]=await Promise.all([
+      tmdb(`/${type}/${id}?language=es-ES`),
+      tmdb(`/${type}/${id}/credits?language=es-ES`),
+    ]);
     const title=det.title||det.name||'';
     const year=(det.release_date||det.first_air_date||'').slice(0,4);
     const rt=det.runtime?`${det.runtime} min`:(det.episode_run_time?.[0]?`${det.episode_run_time[0]} min/ep`:'');
     const cast=(cred.cast||[]).slice(0,8);
     const faved=isFav(type,id);
+
     $('mod-back').style.backgroundImage=det.backdrop_path?`url(${IMG7+det.backdrop_path})`:'';
-    $('mod-poster').src=det.poster_path?IMG5+det.poster_path:'';$('mod-poster').alt=title;
+    $('mod-poster').src=det.poster_path?IMG5+det.poster_path:'';
+    $('mod-poster').alt=title;
     $('mod-tags').innerHTML=(det.genres||[]).map(g=>`<span class="badge">${g.name}</span>`).join('');
     $('mod-title').textContent=title;
-    $('mod-meta').innerHTML=`<span class="star">★ ${det.vote_average?.toFixed(1)||'N/A'}</span>${year?`<span>📅 ${year}</span>`:''}${rt?`<span>⏱ ${rt}</span>`:''}<span>${type==='movie'?'🎬 Película':(isAnime?'⛩️ Anime':'📺 Serie')}</span>`;
-    $('mod-syn').textContent=det.overview||'Sin descripción.';
+    $('mod-meta').innerHTML=`
+      <span class="star">★ ${det.vote_average?.toFixed(1)||'N/A'}</span>
+      ${year?`<span>📅 ${year}</span>`:''}
+      ${rt?`<span>⏱ ${rt}</span>`:''}
+      <span>${isAnime?'⛩️ Anime':type==='movie'?'🎬 Película':'📺 Serie'}</span>
+      ${det.vote_count?`<span>${det.vote_count.toLocaleString()} votos</span>`:''}`;
+    // TMDB provee overview en español cuando language=es-ES
+    $('mod-syn').textContent=det.overview||'Sin descripción disponible.';
     $('mod-acts').innerHTML=`
-      <button class="watch-btn" onclick="closeMod();openPlayer('${type}',${id},'${esc(title)}',${!!isAnime})"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Ver ahora</button>
-      <button class="fav-btn${faved?' on':''}" id="fav-btn-mod" onclick="toggleFav('${type}',${id},'${esc(title)}','${det.poster_path||''}',${det.vote_average||0})">${faved?'❤️ En favoritos':'🤍 Favoritos'}</button>`;
-    $('mod-cast').innerHTML=cast.length?`<div class="cast-t">Reparto</div><div class="cast-list">${cast.map(a=>`<span class="cast-chip">${esc(a.name)}</span>`).join('')}</div>`:'';
+      <button class="watch-btn" onclick="closeMod();openPlayer('${type}',${id},'${esc(title)}',${isAnime})">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Ver ahora
+      </button>
+      <button class="fav-btn${faved?' on':''}" id="fav-btn-mod" onclick="toggleFav('${type}',${id},'${esc(title)}','${det.poster_path||''}',${det.vote_average||0})">
+        ${faved?'❤️ En favoritos':'🤍 Favoritos'}
+      </button>`;
+    $('mod-cast').innerHTML=cast.length
+      ?`<div class="cast-t">Reparto</div><div class="cast-list">${cast.map(a=>`<span class="cast-chip">${esc(a.name)}</span>`).join('')}</div>`:'' ;
     $('mod').scrollTop=0;show('mod-ov');document.body.style.overflow='hidden';
   }catch(e){console.error(e);toast('Error al cargar detalles');}
-  finally{hide('loader-ov');}
-}
-
-// ══════════════════════════════════════
-//  DETAIL — ANIME
-//  Jikan: títulos y sinopsis en español
-//  AnimeFLV: buscamos el anime para streaming latino
-// ══════════════════════════════════════
-async function openAnimeDetail(malId,fallback=''){
-  show('loader-ov');
-  try{
-    // Jikan para metadata en español
-    const jr=await jikan(`/anime/${malId}/full`);
-    const d=jr.data||{};
-    const title=d.title_spanish||d.title_english||d.title||fallback;
-    const rat=d.score?d.score.toFixed(1):'N/A';
-    const genres=(d.genres||[]).map(g=>g.name);
-    const totalEps=d.episodes||100;
-    const statusMap={'Currently Airing':'🟢 En emisión','Finished Airing':'✅ Finalizado','Not yet aired':'🔜 Próximamente'};
-    const status=statusMap[d.status]||d.status||'';
-
-    // Sinopsis en español — limpiar texto inglés
-    const syn=(d.synopsis||'Sin sinopsis.')
-      .replace(/\[Written.*?\]/g,'').replace(/\(Source:.*?\)/g,'').trim();
-
-    const poster=d.images?.jpg?.large_image_url||'';
-
-    $('mod-back').style.backgroundImage=poster?`url(${poster})`:'';
-    $('mod-poster').src=poster;$('mod-poster').alt=title;
-    $('mod-tags').innerHTML=genres.slice(0,5).map(g=>`<span class="badge">${g}</span>`).join('');
-    $('mod-title').textContent=title;
-    $('mod-meta').innerHTML=`<span class="star">★ ${rat}</span>${d.year?`<span>📅 ${d.year}</span>`:''}<span>📺 ${totalEps||'?'} eps</span><span>⛩️ Anime</span>${status?`<span>${status}</span>`:''}`;
-    $('mod-syn').textContent=syn;
-    $('mod-acts').innerHTML=`<button class="watch-btn" onclick="closeMod();openAnimePlayer(${malId},'${esc(title)}',${totalEps})">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Ver ahora
-    </button>`;
-    $('mod-cast').innerHTML='';
-    $('mod').scrollTop=0;show('mod-ov');document.body.style.overflow='hidden';
-  }catch(e){console.error(e);toast('Error al cargar anime');}
   finally{hide('loader-ov');}
 }
 
@@ -498,183 +445,82 @@ function closeMod(event){
   hide('mod-ov');document.body.style.overflow='';
 }
 
-// ══════════════════════════════════════
-//  PLAYER — Películas / Series (VidSrc)
-// ══════════════════════════════════════
+// ═══════════════════════════════
+//  PLAYER — Películas / Series
+// ═══════════════════════════════
 async function openPlayer(type,id,title,isAnime=false){
   show('loader-ov');
-  pl={type,tmdbId:id,malId:null,flvId:null,s:1,ep:1,seasons:[],eps:[],thumbs:{},
-      title:title||'',poster:'',isAnime,lang:'lat',total:0,srcIdx:0,srcList:[],flvServers:[]};
+  pl={type,tmdbId:id,animeId:isAnime?id:null,s:1,ep:1,seasons:[],eps:[],thumbs:{},
+      title:title||'',poster:'',isAnime,lang:'es',total:0,srcIdx:0};
+
   if(type==='tv'){
     try{
       const det=await tmdb(`/tv/${id}?language=es-ES`);
       pl.seasons=(det.seasons||[]).filter(s=>s.season_number>0);
-      buildPills(['sub','dub']);
+      buildPills(isAnime?['es','sub']:['es','sub']);
       await loadSeasonEps(1);show('ep-panel');
     }catch(e){hide('ep-panel');}
-  }else{hide('ep-panel');buildPills([]);}
+  }else{
+    hide('ep-panel');buildPills([]);
+  }
+
   $('ply-title').textContent=pl.title;
   updBadge();loadFrame();
   hide('loader-ov');hide('mod-ov');
   show('ply-ov');document.body.style.overflow='hidden';
 }
 
-// ══════════════════════════════════════
-//  PLAYER — ANIME (multi-fuente)
-//  1. AnimeFLV via Railway scraper (latino)
-//  2. VidSrc por MAL ID
-//  3. 2embed por MAL ID
-// ══════════════════════════════════════
-async function openAnimePlayer(malId,title,totalEps=100){
-  show('loader-ov');
-  // Obtener poster
-  let poster='';
-  try{const jr=await jikan(`/anime/${malId}`);poster=jr.data?.images?.jpg?.large_image_url||'';}catch(e){}
-
-  pl={type:'anime',tmdbId:0,malId,flvId:null,s:1,ep:1,seasons:[],eps:[],thumbs:{},
-      title:title||'',poster,isAnime:true,lang:'lat',total:totalEps,
-      srcIdx:0,srcList:getAnimeSrcs(malId,1),flvServers:[]};
-
-  // Buscar en AnimeFLV (en paralelo, sin bloquear)
-  findFLVAnime(malId,title).then(flvId=>{
-    if(flvId){
-      pl.flvId=flvId;
-      // Regenerar lista de fuentes con AnimeFLV primero
-      pl.srcList=[`_flv_`,  // placeholder para AnimeFLV dinámico
-        ...getAnimeSrcs(malId,1)];
-      pl.srcIdx=0;
-      loadFrame(); // recargar con AnimeFLV
-    }
-  });
-
-  buildPills(['lat','sub']);
-  show('ep-panel');
-  renderEpList();
-  $('ply-title').textContent=pl.title;
-  updBadge();
-  // Cargar con primer fuente disponible mientras buscamos AnimeFLV
-  loadFrame();
-  hide('loader-ov');hide('mod-ov');
-  show('ply-ov');document.body.style.overflow='hidden';
-}
-
-// Buscar anime en AnimeFLV por MAL ID
-// Primero intenta con el título en español, luego en inglés
-async function findFLVAnime(malId,title){
-  try{
-    // Obtener títulos desde Jikan
-    const jr=await jikan(`/anime/${malId}`);
-    const d=jr.data||{};
-    const queries=[
-      d.title_spanish,
-      d.title_english,
-      d.title,
-      title
-    ].filter(Boolean);
-
-    for(const q of queries){
-      const results=await flvSearch(q);
-      if(results&&results.length>0){
-        // Primer resultado es el más relevante
-        return results[0].id;
-      }
-    }
-  }catch(e){console.warn('FLV search error:',e.message);}
-  return null;
-}
-
-// ══════════════════════════════════════
+// ═══════════════════════════════
 //  LANG PILLS
-// ══════════════════════════════════════
-const PLAB={lat:'🇦🇷 Latino',sub:'🔤 Sub ES',dub:'🔊 Doblado'};
+// ═══════════════════════════════
+const PLAB={es:'🇦🇷 Español',sub:'🔤 Subtítulos'};
 function buildPills(langs){
   const c=$('lang-pills');if(!c)return;
   c.innerHTML=langs.map(l=>`<button class="lpill${pl.lang===l?' on':''}" onclick="setLang('${l}')">${PLAB[l]||l}</button>`).join('');
+  // Botón cambiar fuente siempre visible para anime
+  if(pl.isAnime)c.innerHTML+=`<button class="lpill" onclick="nextSrc()" title="Si no carga, probá otra fuente">⚡ Otra fuente</button>`;
 }
-function setLang(lang){
-  pl.lang=lang;
-  buildPills(pl.isAnime?['lat','sub']:['sub','dub']);
-  pl.srcIdx=0; // resetear fuente al cambiar idioma
-  loadFrame();
-}
+function setLang(lang){pl.lang=lang;buildPills(pl.isAnime?['es','sub']:['es','sub']);loadFrame();}
+function nextSrc(){pl.srcIdx=(pl.srcIdx+1)%SRC_ANIME.length;loadFrame();toast(`Fuente ${pl.srcIdx+1}/${SRC_ANIME.length}`);}
 
-// Botón "Cambiar fuente" si no carga
-function showSrcBtn(){
-  const bar=$('ply-bar-r');if(!bar)return;
-  const ex=$('src-switch-btn');if(ex)return; // ya existe
-  const btn=document.createElement('button');
-  btn.id='src-switch-btn';btn.className='lpill';btn.textContent='⚡ Otra fuente';
-  btn.onclick=switchSource;
-  bar.insertBefore(btn,bar.firstChild);
-}
-function switchSource(){
-  pl.srcIdx=(pl.srcIdx+1)%Math.max(pl.srcList.length,1);
-  loadFrame();
-  toast('Cambiando fuente...');
-}
-
-// ══════════════════════════════════════
-//  FRAME LOADER
-// ══════════════════════════════════════
-async function loadFrame(){
-  const f=$('ply-frame');
-  if(!f)return;
-  showSrcBtn(); // mostrar botón de cambiar fuente
-
-  if(!pl.isAnime){
-    f.src=pl.type==='movie'?SRC_MOVIE(pl.tmdbId):SRC_TV(pl.tmdbId,pl.s,pl.ep);
-    return;
+// ═══════════════════════════════
+//  FRAME — VidSrc por TMDB ID
+// ═══════════════════════════════
+function loadFrame(){
+  const f=$('ply-frame');if(!f)return;
+  if(pl.isAnime){
+    // Anime: usar TMDB ID de la serie con VidSrc
+    // VidSrc soporta series de TMDB incluyendo anime
+    const src=SRC_ANIME[pl.srcIdx%SRC_ANIME.length];
+    f.src=src(pl.tmdbId,pl.ep);
+  }else if(pl.type==='movie'){
+    f.src=SRC_MOV(pl.tmdbId);
+  }else{
+    f.src=SRC_TV(pl.tmdbId,pl.s,pl.ep);
   }
-
-  // ANIME — cascada de fuentes
-  const sources=getAnimeSrcs(pl.malId,pl.ep);
-
-  // Si tenemos AnimeFLV, cargarlo dinámicamente
-  if(pl.flvId&&pl.lang==='lat'){
-    f.src='about:blank'; // limpiar
-    show('loader-ov');
-    try{
-      const data=await flvEmbed(pl.flvId,pl.ep);
-      hide('loader-ov');
-      if(data&&data.servers&&data.servers.length>0){
-        // Preferir servidores que no sean mega/MEGA
-        const preferred=data.servers.find(s=>
-          s.title&&!s.title.toLowerCase().includes('mega')&&s.code
-        )||data.servers[0];
-        if(preferred?.code){
-          f.src=preferred.code;
-          return;
-        }
-      }
-      // Si no hay servers de AnimeFLV, abrir la página directa
-      if(data?.page){f.src=data.page;return;}
-    }catch(e){hide('loader-ov');}
-  }
-
-  // Fuentes por MAL ID
-  const idx=pl.srcIdx%sources.length;
-  f.src=sources[idx];
 }
-
 function updBadge(){
   $('ply-epbadge').textContent=(pl.type==='tv'||pl.isAnime)?`Temporada ${pl.s} · Episodio ${pl.ep}`:'';
 }
 
-// ══════════════════════════════════════
+// ═══════════════════════════════
 //  PANEL DE EPISODIOS
-// ══════════════════════════════════════
+// ═══════════════════════════════
 async function loadSeasonEps(season){
   pl.s=season;pl.ep=1;
   const stabs=$('ep-stabs');
   if(stabs&&pl.seasons.length>0)
-    stabs.innerHTML=pl.seasons.map(s=>`<button class="ep-stab${s.season_number===season?' on':''}" onclick="switchSeason(${s.season_number})">T${s.season_number}</button>`).join('');
+    stabs.innerHTML=pl.seasons.map(s=>
+      `<button class="ep-stab${s.season_number===season?' on':''}" onclick="switchSeason(${s.season_number})">T${s.season_number}</button>`
+    ).join('');
   try{
     const d=await tmdb(`/tv/${pl.tmdbId}/season/${season}?language=es-ES`);
     pl.eps=d.episodes||[];pl.total=pl.eps.length;
     pl.eps.forEach(e=>{if(e.still_path)pl.thumbs[e.episode_number]=`https://image.tmdb.org/t/p/w300${e.still_path}`;});
     renderEpList();
-  }catch(e){pl.eps=[];pl.total=12;renderEpList();}
+  }catch(e){pl.eps=[];pl.total=24;renderEpList();}
 }
+
 function switchSeason(s){
   document.querySelectorAll('.ep-stab').forEach(b=>b.classList.toggle('on',parseInt(b.textContent.slice(1))===s));
   loadSeasonEps(s);
@@ -684,14 +530,17 @@ function renderEpList(){
   const list=$('ep-list');if(!list)return;
   const total=pl.isAnime?pl.total:(pl.eps?.length||0);
   if(!total){list.innerHTML='<div style="color:var(--muted);padding:12px">Sin episodios</div>';return;}
+
   const t=pl.isAnime?'anime':'tv';
-  const id=pl.isAnime?pl.malId:pl.tmdbId;
+  const id=pl.tmdbId;
   const wCt=Array.from({length:total},(_,i)=>i+1).filter(ep=>isWatched(t,id,pl.s,ep)).length;
   const ep=$('ep-prog');if(ep)ep.textContent=wCt>0?`${wCt}/${total} vistos`:'';
+
   let html='';
   for(let i=1;i<=total;i++){
     const ep=i;
-    const tvEp=!pl.isAnime&&pl.eps?pl.eps.find(e=>e.episode_number===ep):null;
+    const tvEp=pl.eps?.find(e=>e.episode_number===ep);
+    // Nombre del episodio en español (TMDB retorna en es-ES)
     const name=tvEp?.name||`Capítulo ${ep}`;
     const desc=tvEp?.overview||'';
     const thumb=pl.thumbs[ep]||(pl.isAnime?pl.poster:'');
@@ -699,6 +548,7 @@ function renderEpList(){
     const epProg=getEpProg(t,id,pl.s,ep);
     const pct=epProg?.p||0;
     const playing=(pl.ep===ep);
+
     html+=`<div class="ep-row${playing?' playing':''}${w?' done':''}" onclick="${pl.isAnime?`playAnimeEp(${ep})`:`playTVEp(${ep})`}">
       <div class="ep-thumb-w">
         ${thumb?`<img src="${thumb}" alt="" loading="lazy" onerror="this.style.display='none'">`:''}
@@ -707,10 +557,10 @@ function renderEpList(){
       </div>
       <div class="ep-ri">
         <div class="ep-epname">${esc(name)}</div>
-        ${desc?`<div class="ep-desc">${esc(desc.substring(0,75))}...</div>`:''}
+        ${desc?`<div class="ep-desc">${esc(desc.substring(0,80))}...</div>`:''}
         <div class="ep-bar"><div class="ep-fill ${w?'grn':'red'}" style="width:${w?100:pct}%"></div></div>
       </div>
-      <button class="ep-mrkbtn" onclick="event.stopPropagation();toggleMark(${ep})" title="${w?'Marcar no visto':'Marcar visto'}">${w?'✓':'○'}</button>
+      <button class="ep-mrkbtn" onclick="event.stopPropagation();toggleMark(${ep})" title="${w?'No visto':'Visto'}">${w?'✓':'○'}</button>
     </div>`;
   }
   list.innerHTML=html;
@@ -719,9 +569,8 @@ function renderEpList(){
 
 function toggleMark(ep){
   const t=pl.isAnime?'anime':'tv';
-  const id=pl.isAnime?pl.malId:pl.tmdbId;
-  const w=isWatched(t,id,pl.s,ep);
-  markWatched(t,id,pl.s,ep,!w);
+  const w=isWatched(t,pl.tmdbId,pl.s,ep);
+  markWatched(t,pl.tmdbId,pl.s,ep,!w);
   toast(w?`Ep ${ep}: no visto`:`✓ Ep ${ep}: visto`);
 }
 function playTVEp(ep){
@@ -729,28 +578,22 @@ function playTVEp(ep){
   pl.ep=ep;updBadge();loadFrame();renderEpList();
 }
 function playAnimeEp(ep){
-  if(pl.ep!==ep)setEpProg('anime',pl.malId,1,pl.ep,100);
+  if(pl.ep!==ep)setEpProg('anime',pl.tmdbId,pl.s,pl.ep,100);
   pl.ep=ep;pl.srcIdx=0;updBadge();loadFrame();renderEpList();
 }
 
 function closePly(){
   const t=pl.isAnime?'anime':'tv';
-  const id=pl.isAnime?pl.malId:pl.tmdbId;
-  if(pl.type==='tv'||pl.isAnime)setEpProg(t,id,pl.s,pl.ep,100);
-  hide('ply-ov');$('ply-frame').src='';
-  const btn=$('src-switch-btn');if(btn)btn.remove();
-  document.body.style.overflow='';
+  if(pl.type==='tv'||pl.isAnime)setEpProg(t,pl.tmdbId,pl.s,pl.ep,100);
+  hide('ply-ov');$('ply-frame').src='';document.body.style.overflow='';
 }
 
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){closePly();closeMod();const m=$('mini-ov');if(m)m.remove();}
 });
 
-// ══════════════════════════════════════
-//  HELPERS
-// ══════════════════════════════════════
-const spinI =()=>`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite;vertical-align:middle"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0"/></svg>`;
-const spinB =()=>`<div style="display:flex;align-items:center;justify-content:center;padding:44px;color:var(--muted);grid-column:1/-1"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0"/></svg></div>`;
-const errB  =e=>`<div style="color:var(--red);padding:16px;font-size:.83rem;grid-column:1/-1">⚠️ ${esc(String(e?.message||e))}</div>`;
-const nores =()=>`<div style="color:var(--muted);padding:16px;grid-column:1/-1">Sin resultados.</div>`;
-const noDisp=()=>`<div style="color:var(--muted);padding:12px;font-size:.8rem">No disponible ahora</div>`;
+const spinI=()=>`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite;vertical-align:middle;margin-right:6px"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0"/></svg>`;
+const spinB=()=>`<div style="display:flex;align-items:center;justify-content:center;padding:44px;color:var(--muted);grid-column:1/-1"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0"/></svg></div>`;
+const errB =e=>`<div style="color:var(--red);padding:16px;font-size:.83rem;grid-column:1/-1">⚠️ ${esc(String(e?.message||e))}</div>`;
+const nores=()=>`<div style="color:var(--muted);padding:16px;grid-column:1/-1">Sin resultados.</div>`;
+const noDisp=()=>`<div style="color:var(--muted);padding:12px;font-size:.8rem">No disponible</div>`;
