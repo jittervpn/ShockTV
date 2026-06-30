@@ -197,3 +197,129 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 /* Ep button sin embed disponible */
 .ep-btn.no-embed { opacity: .45; }
 .ep-btn.no-embed:hover { opacity: .7; }
+
+/* ══ LISTA DE EPISODIOS — estilo Anime Underworld ══ */
+.ep-list{
+  overflow-y:auto;
+  max-height:220px;
+  padding:4px 0 8px;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(229,0,26,.3) transparent;
+}
+.ep-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:8px 14px;
+  cursor:pointer;
+  transition:background .14s;
+  position:relative;
+  border-bottom:1px solid rgba(255,255,255,.04);
+}
+.ep-row:hover{background:rgba(255,255,255,.05);}
+.ep-row.ep-playing{background:rgba(229,0,26,.1);}
+.ep-row.ep-playing .ep-row-name{color:var(--red);font-weight:700;}
+.ep-row.ep-done .ep-row-name{color:var(--green);}
+
+/* Miniatura */
+.ep-thumb-wrap{
+  position:relative;
+  flex-shrink:0;
+  width:80px;
+  height:52px;
+  border-radius:6px;
+  overflow:hidden;
+  background:var(--s3);
+}
+.ep-thumb{
+  width:100%;height:100%;
+  object-fit:cover;
+  display:block;
+}
+.ep-thumb-ph{
+  width:80px;height:52px;
+  background:var(--s3);
+}
+.ep-play-icon{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(229,0,26,.5);
+  color:#fff;
+}
+.ep-check-icon{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(34,197,94,.35);
+  color:#fff;
+  font-size:1.1rem;
+  font-weight:700;
+}
+
+/* Info del episodio */
+.ep-row-info{
+  flex:1;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+.ep-row-name{
+  font-size:.84rem;
+  font-weight:600;
+  color:var(--text);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.ep-row-desc{
+  font-size:.72rem;
+  color:var(--muted);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* Barra de progreso */
+.ep-row-bar{
+  height:3px;
+  background:rgba(255,255,255,.1);
+  border-radius:2px;
+  overflow:hidden;
+  margin-top:4px;
+}
+.ep-row-fill{
+  height:100%;
+  background:var(--red);
+  border-radius:2px;
+  transition:width .3s;
+  min-width:0;
+}
+.ep-row.ep-done .ep-row-fill{background:var(--green);}
+
+/* Botón marcar visto */
+.ep-mark-btn{
+  flex-shrink:0;
+  background:none;
+  border:1px solid rgba(255,255,255,.12);
+  color:var(--muted);
+  width:28px;height:28px;
+  border-radius:50%;
+  font-size:.8rem;
+  cursor:pointer;
+  transition:all .15s;
+  display:flex;align-items:center;justify-content:center;
+}
+.ep-mark-btn:hover{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.4);color:var(--green);}
+.ep-row.ep-done .ep-mark-btn{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.4);color:var(--green);}
+
+/* Mobile: lista más compacta */
+@media(max-width:768px){
+  .ep-list{max-height:200px;}
+  .ep-thumb-wrap{width:64px;height:42px;}
+  .ep-row{padding:7px 10px;gap:9px;}
+  .ep-row-name{font-size:.8rem;}
+  .ep-mark-btn{width:24px;height:24px;font-size:.7rem;}
+}
+
+/* no-embed style */
+.ep-btn.no-embed{opacity:.45;}
