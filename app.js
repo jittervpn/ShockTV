@@ -470,8 +470,8 @@ async function loadAnimeEp(epNum){
   try{
     const data=await animeAPI('episode',{slug:pl.animeSlug, number:epNum});
     const servers=data?.data?.servers||{};
-    // Preferir sub (latino generalmente está en sub en AnimeAV1)
-    const allServers=[...(servers.sub||[]),...(servers.dub||[])];
+    // Preferir audio latino/doblado primero
+    const allServers=[...(servers.dub||[]),...(servers.lat||[]),...(servers.sub||[])];
     if(!allServers.length) return false;
     pl.servers=allServers;
     pl.srcIdx=0;
