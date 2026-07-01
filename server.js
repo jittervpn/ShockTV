@@ -96,10 +96,9 @@ app.get('/api/anime/episode', authAnime, asyncH(async (req, res) => {
   if (!slug || !number) return res.status(400).json({ success:false, message:'Faltan parámetros slug y number' });
   const episode = await getEpisode(slug, Number(number));
   if (!episode) return res.status(404).json({ success:false, message:'Episodio no encontrado' });
-  const servers = {
-    sub: episode.embeds?.SUB || [],
-    dub: episode.embeds?.DUB || []
-  };
+  const e=episode.embeds||{};
+  const lat=e.LAT||e.LATINO||e['ES_LA']||e['ES-419']||e.DUB||[];
+  const servers={lat,sub:e.SUB||[],dub:e.DUB||[]};
   res.json({ success:true, data:{ ...episode, servers } });
 }));
 
