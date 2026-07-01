@@ -151,7 +151,7 @@
       </div>
       <div class="ply-bar-r">
         <div class="lang-pills" id="lang-pills"></div>
-        <button class="lpill" onclick="nextSrc()" title="Cambiar fuente si no carga">⚡ Otra fuente</button>
+        <button class="lpill" onclick="openSrcModal()" title="Cambiar fuente si no carga">⚡ Otra fuente</button>
         <button class="ply-x" onclick="closePly()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
     </div>
@@ -163,6 +163,17 @@
         <span class="ep-prog" id="ep-prog"></span>
       </div>
       <div class="ep-list" id="ep-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SOURCE SELECTOR MODAL -->
+<div class="srcmod-ov hidden" id="srcmod-ov" onclick="closeSrcModal(event)">
+  <div class="srcmod">
+    <div class="srcmod-head">Seleccionar reproductor</div>
+    <div class="srcmod-list" id="srcmod-list"></div>
+    <div class="srcmod-foot">
+      <button class="srcmod-cancel" onclick="closeSrcModal()">CANCELAR</button>
     </div>
   </div>
 </div>

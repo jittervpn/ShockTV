@@ -471,7 +471,9 @@ async function loadAnimeEp(epNum){
     const data=await animeAPI('episode',{slug:pl.animeSlug, number:epNum});
     const servers=data?.data?.servers||{};
     // Preferir sub (latino generalmente está en sub en AnimeAV1)
-    const allServers=[...(servers.sub||[]),...(servers.dub||[])];
+    const subServers=(servers.sub||[]).map(s=>({...s,kind:'sub'}));
+    const dubServers=(servers.dub||[]).map(s=>({...s,kind:'dub'}));
+    const allServers=[...subServers,...dubServers];
     if(!allServers.length) return false;
     pl.servers=allServers;
     pl.srcIdx=0;
@@ -497,19 +499,65 @@ function loadFrame(){
   }
 }
 
-// Cambiar entre servidor de AnimeAV1 y Unlimplay
-async function nextSrc(){
-  if(pl.anime&&pl.animeSlug){
-    if(pl.servers.length>1){
-      pl.srcIdx=(pl.srcIdx+1)%pl.servers.length;
-      const s=pl.servers[pl.srcIdx];
-      const url=s.url||s.link||'';
-      if(url){$('ply-frame').src=url;toast(`Fuente ${pl.srcIdx+1}/${pl.servers.length}`);return;}
-    }
+// Cambiar entre servidor de AnimeAV1 y Unlimplay — modal "Seleccionar reproductor"
+const SRC_ICON=`<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>`;
+const CHECK_ICON=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+function buildSrcList(){
+  const list=[];
+  if(pl.anime&&pl.servers&&pl.servers.length){
+    pl.servers.forEach((s,i)=>{
+      const base=s.name||s.server||s.title||`Servidor ${i+1}`;
+      const langTag=s.kind==='dub'?'Latino':(s.kind==='sub'?'Sub · Latino':'');
+      list.push({
+        label:base,
+        tag:langTag,
+        active:i===pl.srcIdx,
+        run:()=>{
+          const url=s.url||s.link||'';
+          if(!url){toast('Fuente no disponible');return;}
+          pl.srcIdx=i;
+          $('ply-frame').src=url;
+          toast(`Reproduciendo: ${base}`);
+        }
+      });
+    });
   }
-  // Fallback Unlimplay
-  $('ply-frame').src=pl.type==='movie'?UNL_MOV(pl.id):UNL_TV(pl.id,pl.s,pl.ep);
-  toast('Cambiado a Unlimplay');
+  // Unlimplay siempre disponible como fuente alterna
+  list.push({
+    label:'Unlimplay',
+    tag:pl.anime?'Alterno':'Latino',
+    active:!(pl.anime&&pl.servers&&pl.servers.length)||pl.srcIdx===-1,
+    run:()=>{
+      pl.srcIdx=-1;
+      $('ply-frame').src=pl.type==='movie'?UNL_MOV(pl.id):UNL_TV(pl.id,pl.s,pl.ep);
+      toast('Cambiado a Unlimplay');
+    }
+  });
+  return list;
+}
+
+function openSrcModal(){
+  const list=buildSrcList();
+  const el=$('srcmod-list');
+  el.innerHTML=list.length?list.map((s,i)=>`
+    <button class="srcmod-item${s.active?' on':''}" onclick="selectSrc(${i})">
+      <span class="srcmod-icon">${SRC_ICON}</span>
+      <span class="srcmod-name">${esc(s.label)}</span>
+      ${s.tag?`<span class="srcmod-tag">${esc(s.tag)}</span>`:''}
+      ${s.active?`<span class="srcmod-check">${CHECK_ICON}</span>`:''}
+    </button>`).join(''):'<div class="srcmod-empty">No hay fuentes disponibles.</div>';
+  window.__srcList=list;
+  show('srcmod-ov');
+}
+function selectSrc(i){
+  const s=window.__srcList?.[i];
+  if(s)s.run();
+  closeSrcModal();
+}
+function closeSrcModal(event){
+  if(event&&event.target!==$('srcmod-ov'))return;
+  hide('srcmod-ov');
 }
 
 function updPlyBadge(){
@@ -594,10 +642,10 @@ function toggleMark(ep){
 }
 function closePly(){
   setProg('tv',pl.id,pl.s,pl.ep,100);
-  hide('ply-ov');$('ply-frame').src='';document.body.style.overflow='';
+  hide('ply-ov');hide('srcmod-ov');$('ply-frame').src='';document.body.style.overflow='';
 }
 
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closePly();closeMod();const m=$('mini-ov');if(m)m.remove();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeSrcModal();closePly();closeMod();const m=$('mini-ov');if(m)m.remove();}});
 
 // Helpers
 const spI=()=>`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite;vertical-align:middle;margin-right:5px"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0"/></svg>`;
