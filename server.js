@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════
 require('dotenv').config();
 const express = require('express');
+const cors    = require('cors');
 const path    = require('path');
 const fs      = require('fs');
 
@@ -11,6 +12,22 @@ const PORT = process.env.PORT || 3000;
 const TMDB_TOKEN  = (process.env.TMDB_TOKEN  || '').trim();
 // Anime1v API Key interna — usamos una fija ya que es nuestro propio servidor
 const ANIME_KEY   = process.env.ANIME_API_KEY || 'shocktv-internal-key';
+
+// ── CORS: permitir el frontend de GitHub Pages (y localhost en dev) ──
+const ALLOWED_ORIGINS = [
+  'https://jittervpn.github.io',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
+];
+app.use(cors({
+  origin(origin, cb) {
+    // Permite peticiones sin origin (curl, apps nativas) y las de la whitelist
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    cb(new Error('CORS bloqueado para: ' + origin));
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'x-api-key']
+}));
 
 app.use(express.json());
 
