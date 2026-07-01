@@ -33,7 +33,11 @@ async function animeAPI(endpoint, params={}){
   const r=await fetch(`/api/anime/${endpoint}?${qs}`,{
     headers:{'x-api-key':ANIME_KEY,accept:'application/json'}
   });
-  if(!r.ok) throw new Error('AnimeAPI '+r.status);
+  if(!r.ok){
+    let msg=`AnimeAPI ${r.status}`;
+    try{const j=await r.json();if(j?.message)msg+=` — ${j.message}`;}catch(e){}
+    throw new Error(msg);
+  }
   return r.json();
 }
 
@@ -393,28 +397,27 @@ async function openPlayer(type,id,title,isAnime=false){
   pl={type,id,s:1,ep:1,seasons:[],eps:[],thumbs:{},title:title||'',poster:'',
       anime:isAnime,total:0,animeSlug:'',servers:[],srcIdx:0};
 
+  let titleEs=title, titleEn=title;
+
   if(type==='tv'){
     try{
       const det=await api(`/tv/${id}?language=es-ES`);
       pl.seasons=(det.seasons||[]).filter(s=>s.season_number>0);
-
-      if(isAnime){
-        // Buscar en AnimeAV1 por título — en paralelo sin bloquear
-        show('ep-panel');
-        const titleSearch=det.name||title;
-        await loadSeasonEps(1);
-        findAnimeAV1(titleSearch,det.original_name||titleSearch);
-      } else {
-        await loadSeasonEps(1);
-        show('ep-panel');
-      }
-    }catch(e){hide('ep-panel');}
+      titleEs=det.name||title;
+      titleEn=det.original_name||titleEs;
+      show('ep-panel');
+      await loadSeasonEps(1);
+    }catch(e){
+      console.error('[TMDB] Error cargando detalles de la serie:', e.message);
+      hide('ep-panel');
+    }
   }else{
     hide('ep-panel');
-    if(isAnime){
-      // Para películas anime también buscamos en AnimeAV1
-      findAnimeAV1(title,title);
-    }
+  }
+
+  // Buscar en AnimeAV1 SIEMPRE que sea anime, sin depender de si TMDB falló arriba
+  if(isAnime){
+    findAnimeAV1(titleEs, titleEn);
   }
 
   $('ply-title').textContent=pl.title;
@@ -425,6 +428,7 @@ async function openPlayer(type,id,title,isAnime=false){
 
 // Buscar anime en AnimeAV1 (async, no bloquea)
 async function findAnimeAV1(titleEs, titleEn){
+  console.log('[AnimeAV1] Buscando:', titleEs, '/', titleEn);
   try{
     // Buscar en español primero
     let res=await animeAPI('search',{q:titleEs});
@@ -439,6 +443,7 @@ async function findAnimeAV1(titleEs, titleEn){
     }
     const animeSlug=results[0].slug;
     pl.animeSlug=animeSlug;
+    console.log('[AnimeAV1] Encontrado, slug:', animeSlug);
     // Obtener info para saber el total de episodios
     const info=await animeAPI('info',{slug:animeSlug});
     const episodes=info?.data?.episodes||[];
@@ -450,7 +455,7 @@ async function findAnimeAV1(titleEs, titleEn){
     toast('✅ AnimeAV1 — Audio latino disponible');
     renderEps();
   }catch(e){
-    console.warn('[AnimeAV1] Error buscando:', e.message);
+    console.error('[AnimeAV1] Error buscando:', e.message);
   }
 }
 
