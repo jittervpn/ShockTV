@@ -28,9 +28,14 @@ async function api(p){return cached(p,async()=>{
 });}
 
 // ── Anime1v API (Railway) ──
+const API_BASE = (window.__API_BASE__ || '').replace(/\/$/, '');
 async function animeAPI(endpoint, params={}){
+  if(!API_BASE){
+    console.error('[AnimeAV1] window.__API_BASE__ no está configurado en config.js — no se puede llamar al backend de Railway');
+    throw new Error('API_BASE no configurado');
+  }
   const qs=new URLSearchParams(params).toString();
-  const r=await fetch(`/api/anime/${endpoint}?${qs}`,{
+  const r=await fetch(`${API_BASE}/api/anime/${endpoint}?${qs}`,{
     headers:{'x-api-key':ANIME_KEY,accept:'application/json'}
   });
   if(!r.ok){
@@ -72,7 +77,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   TOKEN     = window.__TMDB_TOKEN__||'';
   ANIME_KEY = window.__ANIME_KEY__||'';
   if(!TOKEN){
-    try{const r=await fetch('/api/token');if(r.ok){const d=await r.json();TOKEN=d.token||'';ANIME_KEY=d.animeKey||'';}}catch(e){}
+    try{const r=await fetch(`${API_BASE}/api/token`);if(r.ok){const d=await r.json();TOKEN=d.token||'';ANIME_KEY=d.animeKey||ANIME_KEY;}}catch(e){}
   }
   if(!TOKEN&&window.TMDB_TOKEN)TOKEN=window.TMDB_TOKEN;
   if(!TOKEN){
