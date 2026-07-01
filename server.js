@@ -33,15 +33,14 @@ app.get('/api/token',  (req, res) => {
 });
 
 // ══════════════════════════════════════════════
-//  ANIME1V API — rutas integradas
+//  ANIMEAV1-API — rutas integradas (paquete oficial npm)
 //  Endpoints:
 //    GET /api/anime/search?q=naruto
-//    GET /api/anime/info?url=https://animeav1.com/media/naruto
-//    GET /api/anime/episode?url=https://animeav1.com/media/naruto/1
-//    GET /api/anime/catalog?page=1
+//    GET /api/anime/info?slug=naruto
+//    GET /api/anime/episode?slug=naruto&number=1
+//    GET /api/anime/catalog?page=1&genre=accion
 // ══════════════════════════════════════════════
-const { ApiError } = require('./src/utils/api-error');
-const animeService = require('./src/services/anime.service');
+const { getAnime, getCatalog, searchAnime, getEpisode } = require('animeav1-api');
 
 function asyncH(fn) {
   return async (req, res, next) => {
@@ -61,30 +60,41 @@ function authAnime(req, res, next) {
 }
 
 app.get('/api/anime/search', authAnime, asyncH(async (req, res) => {
-  const { q, domain } = req.query;
+  const { q } = req.query;
   if (!q) return res.status(400).json({ success:false, message:'Falta parámetro q' });
-  const data = await animeService.searchAnime(q, domain);
-  res.json(data);
+  const results = await searchAnime(q);
+  res.json({ success:true, data:{ results } });
 }));
 
 app.get('/api/anime/info', authAnime, asyncH(async (req, res) => {
-  const { url } = req.query;
-  if (!url) return res.status(400).json({ success:false, message:'Falta parámetro url' });
-  const data = await animeService.getAnimeInfo(url);
-  res.json(data);
+  const { slug } = req.query;
+  if (!slug) return res.status(400).json({ success:false, message:'Falta parámetro slug' });
+  const anime = await getAnime(slug);
+  if (!anime) return res.status(404).json({ success:false, message:'Anime no encontrado' });
+  res.json({ success:true, data: anime });
 }));
 
 app.get('/api/anime/episode', authAnime, asyncH(async (req, res) => {
-  const { url, includeMega, excludeServers } = req.query;
-  if (!url) return res.status(400).json({ success:false, message:'Falta parámetro url' });
-  const data = await animeService.getEpisodeLinks(url, includeMega, excludeServers);
-  res.json(data);
+  const { slug, number } = req.query;
+  if (!slug || !number) return res.status(400).json({ success:false, message:'Faltan parámetros slug y number' });
+  const episode = await getEpisode(slug, Number(number));
+  if (!episode) return res.status(404).json({ success:false, message:'Episodio no encontrado' });
+  const servers = {
+    sub: episode.embeds?.SUB || [],
+    dub: episode.embeds?.DUB || []
+  };
+  res.json({ success:true, data:{ ...episode, servers } });
 }));
 
 app.get('/api/anime/catalog', authAnime, asyncH(async (req, res) => {
-  const data = await animeService.getCatalog?.(req.query.page, req.query.genre)
-    || { success:false, message:'No soportado' };
-  res.json(data);
+  const { page, letter, genre, category, minYear, maxYear, status, order } = req.query;
+  const data = await getCatalog({
+    page: page ? Number(page) : undefined,
+    letter, category, minYear: minYear ? Number(minYear) : undefined,
+    maxYear: maxYear ? Number(maxYear) : undefined, status, order,
+    genre: Array.isArray(genre) ? genre : genre
+  });
+  res.json({ success:true, data });
 }));
 
 // Error handler
