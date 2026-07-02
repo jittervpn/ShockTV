@@ -46,6 +46,19 @@ async function animeAPI(endpoint, params={}){
   return r.json();
 }
 
+// Jikan (MyAnimeList) — solo metadata, se usa como respaldo para hallar títulos alternativos
+async function jikanAPI(endpoint, params={}){
+  if(!API_BASE) return null;
+  const qs=new URLSearchParams(params).toString();
+  try{
+    const r=await fetch(`${API_BASE}/api/jikan/${endpoint}?${qs}`,{
+      headers:{'x-api-key':ANIME_KEY,accept:'application/json'}
+    });
+    if(!r.ok)return null;
+    return r.json();
+  }catch(e){console.warn('[Jikan] Error:',e.message);return null;}
+}
+
 // Estado
 let hero=[],heroI=0,heroT=null;
 let pl={type:'',id:0,s:1,ep:1,seasons:[],eps:[],thumbs:{},
@@ -440,7 +453,25 @@ async function findAnimeAV1(titleEs, titleEn){
     if(!res?.data?.results?.length && titleEn!==titleEs){
       res=await animeAPI('search',{q:titleEn});
     }
-    const results=res?.data?.results||[];
+    let results=res?.data?.results||[];
+
+    // Respaldo: si TMDB no matcheó, pedimos a Jikan (MAL) títulos alternativos
+    // (inglés/japonés/sinónimos) y reintentamos — no toca el flujo si ya hubo hit arriba.
+    if(!results.length){
+      const jk=await jikanAPI('titles',{q:titleEs});
+      const alts=(jk?.data?.titles||[]).filter(t=>t&&t.toLowerCase()!==titleEs.toLowerCase()&&t.toLowerCase()!==titleEn.toLowerCase());
+      for(const alt of alts){
+        try{
+          const r2=await animeAPI('search',{q:alt});
+          if(r2?.data?.results?.length){
+            results=r2.data.results;
+            console.log('[AnimeAV1] Encontrado vía título alterno (Jikan):', alt);
+            break;
+          }
+        }catch(e){/* seguimos probando con el siguiente título */}
+      }
+    }
+
     if(!results.length){
       console.log('[AnimeAV1] No encontrado:', titleEs);
       // Seguir con Unlimplay (ya está cargado)
