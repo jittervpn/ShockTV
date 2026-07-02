@@ -12,6 +12,8 @@ const PORT = process.env.PORT || 3000;
 const TMDB_TOKEN  = (process.env.TMDB_TOKEN  || '').trim();
 // Anime1v API Key interna — usamos una fija ya que es nuestro propio servidor
 const ANIME_KEY   = process.env.ANIME_API_KEY || 'shocktv-internal-key';
+// URL pública de tu instancia de PeliApi (deploy aparte, ver README) — opcional
+const PELIAPI_BASE = (process.env.PELIAPI_BASE_URL || '').replace(/\/$/, '');
 
 // ── CORS: permitir el frontend de GitHub Pages (y localhost en dev) ──
 const ALLOWED_ORIGINS = [
@@ -149,6 +151,42 @@ app.get('/api/jikan/titles', authAnime, asyncH(async (req, res) => {
   const out = [...titles].filter(Boolean).slice(0, 10);
   jikanCache.set(ck, { v: out, t: Date.now() });
   res.json({ success:true, data:{ titles: out } });
+}));
+
+// ══════════════════════════════════════════════
+//  PELIAPI — proxy liviano a una instancia SEPARADA
+//  (PeliApi es un server aparte con Puppeteer/ffmpeg/yt-dlp,
+//   NO se corre dentro de este proceso). Ver README.
+//  Requiere PELIAPI_BASE_URL en las variables de entorno.
+//  Fuente adicional para PELÍCULAS — no reemplaza Unlimplay.
+//  Endpoints:
+//    GET /api/peli/search?q=avatar
+//    GET /api/peli/info?slug=...&type=movie
+// ══════════════════════════════════════════════
+async function peliFetch(path) {
+  if (!PELIAPI_BASE) return { success:false, message:'PELIAPI_BASE_URL no configurado', data:null };
+  try {
+    const r = await fetch(`${PELIAPI_BASE}${path}`);
+    if (!r.ok) return { success:false, message:`PeliApi ${r.status}`, data:null };
+    return await r.json();
+  } catch (e) {
+    return { success:false, message:'PeliApi no disponible: ' + e.message, data:null };
+  }
+}
+
+app.get('/api/peli/search', authAnime, asyncH(async (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.status(400).json({ success:false, message:'Falta parámetro q' });
+  const out = await peliFetch(`/api/v1/content/search?s=${encodeURIComponent(q)}`);
+  res.json(out);
+}));
+
+app.get('/api/peli/info', authAnime, asyncH(async (req, res) => {
+  const { slug, type, provider } = req.query;
+  if (!slug) return res.status(400).json({ success:false, message:'Falta parámetro slug' });
+  const qs = new URLSearchParams({ type: type || 'movie', ...(provider ? { provider } : {}) }).toString();
+  const out = await peliFetch(`/api/v1/content/info/${encodeURIComponent(slug)}?${qs}`);
+  res.json(out);
 }));
 
 // Error handler
