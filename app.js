@@ -59,12 +59,26 @@ async function jikanAPI(endpoint, params={}){
   }catch(e){console.warn('[Jikan] Error:',e.message);return null;}
 }
 
+// PeliApi — fuente adicional de servidores para películas (proxeada por nuestro backend)
+async function peliAPI(endpoint, params={}){
+  if(!API_BASE) return null;
+  const qs=new URLSearchParams(params).toString();
+  try{
+    const r=await fetch(`${API_BASE}/api/peli/${endpoint}?${qs}`,{
+      headers:{'x-api-key':ANIME_KEY,accept:'application/json'}
+    });
+    if(!r.ok)return null;
+    return r.json();
+  }catch(e){console.warn('[PeliApi] Error:',e.message);return null;}
+}
+
 // Estado
 let hero=[],heroI=0,heroT=null;
 let pl={type:'',id:0,s:1,ep:1,seasons:[],eps:[],thumbs:{},
         title:'',poster:'',anime:false,total:0,
         animeSlug:'', // slug del anime en AnimeAV1
-        servers:[],   // servidores del episodio actual
+        servers:[],   // servidores del episodio actual (AnimeAV1)
+        peliServers:[], peliIdx:-1, // servidores de PeliApi (solo películas)
         srcIdx:0};
 let favs={},prog={};
 
@@ -413,7 +427,7 @@ function closeMod(event){
 async function openPlayer(type,id,title,isAnime=false){
   show('loader-ov');
   pl={type,id,s:1,ep:1,seasons:[],eps:[],thumbs:{},title:title||'',poster:'',
-      anime:isAnime,total:0,animeSlug:'',servers:[],srcIdx:0};
+      anime:isAnime,total:0,animeSlug:'',servers:[],peliServers:[],peliIdx:-1,srcIdx:0};
 
   let titleEs=title, titleEn=title;
 
@@ -436,6 +450,11 @@ async function openPlayer(type,id,title,isAnime=false){
   // Buscar en AnimeAV1 SIEMPRE que sea anime, sin depender de si TMDB falló arriba
   if(isAnime){
     findAnimeAV1(titleEs, titleEn);
+  }
+  // Buscar en PeliApi solo para películas (no anime, no series) — corre en paralelo,
+  // no bloquea la carga inicial de Unlimplay ni la reemplaza.
+  if(type==='movie'&&!isAnime){
+    findPeliApi(titleEs);
   }
 
   $('ply-title').textContent=pl.title;
@@ -495,6 +514,34 @@ async function findAnimeAV1(titleEs, titleEn){
   }
 }
 
+// Buscar la película en PeliApi (PelisPlus/RePelisHD/Cuevana3) y sumar sus
+// servidores al selector "⚡ Otra fuente" — no toca Unlimplay para nada.
+async function findPeliApi(title){
+  console.log('[PeliApi] Buscando:', title);
+  try{
+    const res=await peliAPI('search',{q:title});
+    const results=res?.data||[];
+    if(!results.length){
+      console.log('[PeliApi] No encontrado:', title);
+      return;
+    }
+    const top=results[0];
+    const slug=top.slug||top.id;
+    if(!slug)return;
+    const info=await peliAPI('info',{slug,type:'movie',provider:top.provider||''});
+    const servers=info?.data?.servers||[];
+    if(!servers.length){
+      console.log('[PeliApi] Sin servidores para:', title);
+      return;
+    }
+    pl.peliServers=servers;
+    console.log('[PeliApi] Encontrado, servidores:', servers.length);
+    toast(`✅ PeliApi — ${servers.length} servidor(es) más disponibles`);
+  }catch(e){
+    console.warn('[PeliApi] Error buscando:', e.message);
+  }
+}
+
 // Cargar episodio desde AnimeAV1 y reproducir
 async function loadAnimeEp(epNum){
   if(!pl.animeSlug) return false;
@@ -547,7 +594,25 @@ function buildSrcList(){
         run:()=>{
           const url=s.url||s.link||'';
           if(!url){toast('Fuente no disponible');return;}
-          pl.srcIdx=i;
+          pl.srcIdx=i;pl.peliIdx=-1;
+          $('ply-frame').src=url;
+          toast(`Reproduciendo: ${base}`);
+        }
+      });
+    });
+  }
+  // Servidores de PeliApi (solo películas) — PelisPlus / RePelisHD / Cuevana3
+  if(!pl.anime&&pl.peliServers&&pl.peliServers.length){
+    pl.peliServers.forEach((s,i)=>{
+      const base=s.name||s.server||`PeliApi ${i+1}`;
+      list.push({
+        label:base,
+        tag:s.language||'Latino',
+        active:i===pl.peliIdx,
+        run:()=>{
+          const url=s.embedUrl||s.url||'';
+          if(!url){toast('Fuente no disponible');return;}
+          pl.peliIdx=i;pl.srcIdx=-1;
           $('ply-frame').src=url;
           toast(`Reproduciendo: ${base}`);
         }
@@ -555,12 +620,14 @@ function buildSrcList(){
     });
   }
   // Unlimplay siempre disponible como fuente alterna
+  const hasAnimeSrc=pl.anime&&pl.servers&&pl.servers.length;
+  const hasPeliSrc=!pl.anime&&pl.peliServers&&pl.peliServers.length;
   list.push({
     label:'Unlimplay',
-    tag:pl.anime?'Alterno':'Latino',
-    active:!(pl.anime&&pl.servers&&pl.servers.length)||pl.srcIdx===-1,
+    tag:(hasAnimeSrc||hasPeliSrc)?'Alterno':'Latino',
+    active:pl.srcIdx===-1&&pl.peliIdx===-1,
     run:()=>{
-      pl.srcIdx=-1;
+      pl.srcIdx=-1;pl.peliIdx=-1;
       $('ply-frame').src=pl.type==='movie'?UNL_MOV(pl.id):UNL_TV(pl.id,pl.s,pl.ep);
       toast('Cambiado a Unlimplay');
     }
