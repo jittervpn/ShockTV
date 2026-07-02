@@ -113,6 +113,44 @@ app.get('/api/anime/catalog', authAnime, asyncH(async (req, res) => {
   res.json({ success:true, data });
 }));
 
+// ══════════════════════════════════════════════
+//  JIKAN v4 (MyAnimeList no oficial) — SOLO metadata
+//  Uso: dar títulos alternativos (inglés/japonés/sinónimos)
+//  para reintentar la búsqueda en AnimeAV1 cuando el título
+//  de TMDB (en español) no encuentra coincidencia directa.
+//  No provee servidores de video — no reemplaza AnimeAV1.
+//  Endpoint: GET /api/jikan/titles?q=Nombre
+// ══════════════════════════════════════════════
+const jikanCache = new Map(); // cache simple en memoria (TTL 1h) — Jikan tiene rate limit público
+app.get('/api/jikan/titles', authAnime, asyncH(async (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.status(400).json({ success:false, message:'Falta parámetro q' });
+
+  const ck = q.toLowerCase().trim();
+  const hit = jikanCache.get(ck);
+  if (hit && Date.now() - hit.t < 3600000) {
+    return res.json({ success:true, data:{ titles: hit.v } });
+  }
+
+  const r = await fetch(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(q)}&limit=3`);
+  if (!r.ok) {
+    // Jikan devuelve 429 si se pasa el rate limit público (~3 req/s) — no rompemos la app, solo sin sugerencias
+    return res.json({ success:true, data:{ titles: [] } });
+  }
+  const json = await r.json();
+  const items = json?.data || [];
+  const titles = new Set();
+  items.forEach(it => {
+    if (it.title) titles.add(it.title);
+    if (it.title_english) titles.add(it.title_english);
+    if (it.title_japanese) titles.add(it.title_japanese);
+    (it.title_synonyms || []).forEach(s => titles.add(s));
+  });
+  const out = [...titles].filter(Boolean).slice(0, 10);
+  jikanCache.set(ck, { v: out, t: Date.now() });
+  res.json({ success:true, data:{ titles: out } });
+}));
+
 // Error handler
 app.use((err, req, res, next) => {
   const status = err.statusCode || 500;
